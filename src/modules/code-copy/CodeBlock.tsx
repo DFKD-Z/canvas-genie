@@ -37,7 +37,7 @@ export function CodeBlock({
         className
       )}
     >
-      <div className="flex shrink-0 items-center justify-between border-b border-[hsl(var(--border))] bg-[hsl(var(--muted))]/50 px-3 py-2">
+      <div className="flex shrink-0 items-center justify-between border-b border-[hsl(var(--border))] px-3 py-2">
         <span className="text-xs font-medium text-[hsl(var(--muted-foreground))]">
           生成代码（可直接复制到项目）
         </span>

@@ -19,7 +19,7 @@ export default function CodePage() {
 
   if (code === null) {
     return (
-      <div className="flex min-h-screen w-full items-center justify-center bg-black p-6">
+      <div className="flex min-h-screen w-full items-center justify-center p-6">
         <p className="text-sm text-neutral-400">
           请在主页面生成代码后点击「代码」按钮打开
         </p>
@@ -28,7 +28,7 @@ export default function CodePage() {
   }
 
   return (
-    <div className="flex h-screen w-full flex-col bg-black">
+    <div className="flex h-screen w-full flex-col">
       <CodeBlock
         code={code}
         fill

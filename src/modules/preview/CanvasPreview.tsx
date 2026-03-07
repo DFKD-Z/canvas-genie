@@ -45,7 +45,7 @@ export function CanvasPreview({ generated, className }: CanvasPreviewProps) {
   return (
     <div className={cn("flex h-full flex-col", className)}>
       <div className="flex-1 min-h-0 flex flex-col">
-        <div className="flex-1 min-h-0 bg-[hsl(var(--card))]">
+        <div className="flex-1 min-h-0">
           {is2d && generated ? (
             <Canvas2DRunner
               key={generated.code}
