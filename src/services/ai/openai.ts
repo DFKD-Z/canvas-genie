@@ -44,7 +44,11 @@ export function createOpenAIAdapter(options?: OpenAIAdapterOptions): AIAdapter {
   const isQwen = model.includes("qwen");
 
   return {
-    async generateCanvasCode(userMessage: string, conversationHistory?: { role: string; content: string }[]) {
+    async generateCanvasCode(
+      userMessage: string,
+      conversationHistory?: { role: string; content: string }[],
+      currentCode?: string
+    ) {
       if (isQwen && !baseURL) {
         throw new Error(
           "使用 Qwen 模型时请在 .env.local 中设置 OPENAI_BASE_URL，例如：OPENAI_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1"
@@ -57,7 +61,7 @@ export function createOpenAIAdapter(options?: OpenAIAdapterOptions): AIAdapter {
           role: m.role as "user" | "assistant",
           content: m.content,
         })),
-        { role: "user", content: buildUserPrompt(userMessage) },
+        { role: "user", content: buildUserPrompt(userMessage, currentCode) },
       ];
 
       try {

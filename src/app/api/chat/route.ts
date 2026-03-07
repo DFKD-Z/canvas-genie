@@ -4,9 +4,10 @@ import { createOpenAIAdapter } from "@/services/ai/openai";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { message, history = [], apiKey, model } = body as {
+    const { message, history = [], currentCode, apiKey, model } = body as {
       message?: string;
       history?: { role: string; content: string }[];
+      currentCode?: string;
       apiKey?: string;
       model?: string;
     };
@@ -19,7 +20,7 @@ export async function POST(request: NextRequest) {
     const adapter = createOpenAIAdapter(
       apiKey || model ? { ...(apiKey && { apiKey }), ...(model && { model }) } : undefined
     );
-    const result = await adapter.generateCanvasCode(message, history);
+    const result = await adapter.generateCanvasCode(message, history, currentCode);
     return NextResponse.json({ code: 0, data: result, msg: "ok" });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";

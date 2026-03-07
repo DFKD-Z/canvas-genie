@@ -7,8 +7,12 @@ Rules:
 4. Set canvas width/height from container: canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight;
 5. No external libraries. No Node.js or require/import.
 6. Code must be self-contained and run when executed. Use requestAnimationFrame for animations.
-7. Respond with the raw code only.`;
+7. Respond with the raw code only.
+8. If the user provides "current code" or the conversation history contains code you previously generated, you MUST do incremental edits only: keep the existing style and structure, and only add or modify what the user asks for. Do not rewrite the entire canvas from scratch.`;
 
-export function buildUserPrompt(description: string): string {
+export function buildUserPrompt(description: string, currentCode?: string): string {
+  if (currentCode?.trim()) {
+    return `当前画布已有以下代码，请在其基础上按用户新需求修改，保持风格一致。\n\n当前代码：\n\`\`\`javascript\n${currentCode.trim()}\n\`\`\`\n\n用户新需求：${description}`;
+  }
   return `Generate 2D Canvas code for: ${description}`;
 }

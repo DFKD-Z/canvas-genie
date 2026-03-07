@@ -59,11 +59,19 @@ export function ChatPanel({ messages, setMessages, onCodeGenerated, onNewChat, c
       setMessages((prev) => [...prev, userMsg]);
       setLoading(true);
       try {
-        const history = messages.map((m) => ({
-          role: m.role,
-          content: m.content,
-        }));
+        const history = messages.map((m) => {
+          if (m.role === "assistant" && m.generatedCode?.code) {
+            return {
+              role: m.role,
+              content: `已生成 Canvas 代码：\n\n\`\`\`javascript\n${m.generatedCode.code}\n\`\`\``,
+            };
+          }
+          return { role: m.role, content: m.content };
+        });
+        const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant" && m.generatedCode?.code);
+        const currentCode = lastAssistant?.generatedCode?.code;
         const body: Record<string, unknown> = { message: content, history };
+        if (currentCode) body.currentCode = currentCode;
         if (apiKey.trim()) body.apiKey = apiKey.trim();
         if (model) body.model = model;
         const res = await fetch("/api/chat", {
