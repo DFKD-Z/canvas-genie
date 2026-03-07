@@ -50,7 +50,7 @@ export function MessageList({ messages, loading = false, className }: MessageLis
           <div
             key={msg.id}
             className={cn(
-              "flex",
+              "flex mb-4",
               msg.role === "user" ? "justify-end" : "justify-start"
             )}
           >
