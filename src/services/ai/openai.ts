@@ -47,7 +47,8 @@ export function createOpenAIAdapter(options?: OpenAIAdapterOptions): AIAdapter {
     async generateCanvasCode(
       userMessage: string,
       conversationHistory?: { role: string; content: string }[],
-      currentCode?: string
+      currentCode?: string,
+      imageDataUrl?: string
     ) {
       if (isQwen && !baseURL) {
         throw new Error(
@@ -55,13 +56,22 @@ export function createOpenAIAdapter(options?: OpenAIAdapterOptions): AIAdapter {
         );
       }
 
+      const hasImage = typeof imageDataUrl === "string" && imageDataUrl.startsWith("data:image/");
+      const textContent = buildUserPrompt(userMessage, currentCode, hasImage);
+      const userContent: string | OpenAI.Chat.ChatCompletionContentPart[] = hasImage
+        ? [
+            { type: "text", text: textContent },
+            { type: "image_url", image_url: { url: imageDataUrl, detail: "auto" } },
+          ]
+        : textContent;
+
       const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
         { role: "system", content: SYSTEM_PROMPT_2D },
         ...(conversationHistory ?? []).map((m) => ({
           role: m.role as "user" | "assistant",
           content: m.content,
         })),
-        { role: "user", content: buildUserPrompt(userMessage, currentCode) },
+        { role: "user", content: userContent },
       ];
 
       try {

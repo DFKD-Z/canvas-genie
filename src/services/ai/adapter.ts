@@ -4,6 +4,7 @@ export interface AIAdapter {
   generateCanvasCode(
     userMessage: string,
     conversationHistory?: { role: string; content: string }[],
-    currentCode?: string
+    currentCode?: string,
+    imageDataUrl?: string
   ): Promise<GeneratedCode>;
 }

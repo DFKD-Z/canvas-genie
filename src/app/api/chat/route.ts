@@ -4,23 +4,26 @@ import { createOpenAIAdapter } from "@/services/ai/openai";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { message, history = [], currentCode, apiKey, model } = body as {
+    const { message, history = [], currentCode, apiKey, model, imageDataUrl } = body as {
       message?: string;
       history?: { role: string; content: string }[];
       currentCode?: string;
       apiKey?: string;
       model?: string;
+      imageDataUrl?: string;
     };
-    if (!message || typeof message !== "string") {
+    const msg = typeof message === "string" ? message : "";
+    const hasImage = typeof imageDataUrl === "string" && imageDataUrl.startsWith("data:image/");
+    if (!msg.trim() && !hasImage) {
       return NextResponse.json(
-        { code: 400, msg: "Missing or invalid message" },
+        { code: 400, msg: "Message or image required" },
         { status: 400 }
       );
     }
     const adapter = createOpenAIAdapter(
       apiKey || model ? { ...(apiKey && { apiKey }), ...(model && { model }) } : undefined
     );
-    const result = await adapter.generateCanvasCode(message, history, currentCode);
+    const result = await adapter.generateCanvasCode(msg, history, currentCode, hasImage ? imageDataUrl : undefined);
     return NextResponse.json({ code: 0, data: result, msg: "ok" });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";

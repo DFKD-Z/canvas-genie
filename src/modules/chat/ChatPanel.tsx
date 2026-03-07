@@ -50,11 +50,12 @@ export function ChatPanel({ messages, setMessages, onCodeGenerated, onNewChat, c
   }, []);
 
   const handleSend = useCallback(
-    async (content: string) => {
+    async (content: string, imageDataUrl?: string) => {
       const userMsg: ChatMessageType = {
         id: `user-${Date.now()}`,
         role: "user",
         content,
+        ...(imageDataUrl && { imageDataUrl }),
       };
       setMessages((prev) => [...prev, userMsg]);
       setLoading(true);
@@ -66,11 +67,13 @@ export function ChatPanel({ messages, setMessages, onCodeGenerated, onNewChat, c
               content: `已生成 Canvas 代码：\n\n\`\`\`javascript\n${m.generatedCode.code}\n\`\`\``,
             };
           }
-          return { role: m.role, content: m.content };
+          const text = m.content?.trim() || (m.imageDataUrl ? "[附一张参考图]" : "");
+          return { role: m.role, content: text };
         });
         const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant" && m.generatedCode?.code);
         const currentCode = lastAssistant?.generatedCode?.code;
         const body: Record<string, unknown> = { message: content, history };
+        if (imageDataUrl) body.imageDataUrl = imageDataUrl;
         if (currentCode) body.currentCode = currentCode;
         if (apiKey.trim()) body.apiKey = apiKey.trim();
         if (model) body.model = model;

@@ -87,9 +87,13 @@ export function createRecordId(): string {
 }
 
 /** 从首条用户消息生成标题，无则返回默认标题 */
-export function recordTitleFromMessages(messages: { role: string; content: string }[]): string {
+export function recordTitleFromMessages(
+  messages: { role: string; content: string; imageDataUrl?: string }[]
+): string {
   const firstUser = messages.find((m) => m.role === "user");
-  if (!firstUser?.content?.trim()) return "新对话";
-  const raw = firstUser.content.trim();
-  return raw.length > 24 ? `${raw.slice(0, 24)}…` : raw;
+  if (!firstUser) return "新对话";
+  const raw = firstUser.content?.trim() ?? "";
+  if (raw) return raw.length > 24 ? `${raw.slice(0, 24)}…` : raw;
+  if (firstUser.imageDataUrl) return "图片 + 描述";
+  return "新对话";
 }

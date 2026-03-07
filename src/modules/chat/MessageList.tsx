@@ -63,13 +63,25 @@ export function MessageList({ messages, loading = false, className }: MessageLis
           >
             <div
               className={cn(
-                "max-w-[85%] rounded-2xl px-4 py-2.5 text-sm shadow-sm",
+                "max-w-[85%] rounded-2xl px-4 py-2.5 text-sm shadow-sm space-y-2",
                 msg.role === "user"
                   ? "rounded-br-md bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]"
                   : "rounded-bl-md bg-[hsl(var(--muted))] text-[hsl(var(--foreground))]"
               )}
             >
-              <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+              {msg.imageDataUrl && (
+                <img
+                  src={msg.imageDataUrl}
+                  alt="参考图"
+                  className="max-h-32 rounded-lg object-contain"
+                />
+              )}
+              {(msg.content?.trim() ?? "") && (
+                <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+              )}
+              {msg.role === "user" && msg.imageDataUrl && !msg.content?.trim() && (
+                <p className="text-xs opacity-80">根据图片生成</p>
+              )}
             </div>
           </div>
         ))}
