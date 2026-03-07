@@ -45,9 +45,6 @@ export function CanvasPreview({ generated, className }: CanvasPreviewProps) {
   return (
     <div className={cn("flex h-full flex-col", className)}>
       <div className="flex-1 min-h-0 flex flex-col">
-        <div className="flex shrink-0 items-center justify-between border-b border-[hsl(var(--border))] px-4 py-2">
-          <span className="text-sm font-medium">预览</span>
-        </div>
         <div className="flex-1 min-h-0 bg-[hsl(var(--card))]">
           {is2d && generated ? (
             <Canvas2DRunner

@@ -14,9 +14,16 @@ interface MessageListProps {
 function LoadingBubble() {
   return (
     <div className="flex justify-start">
-      <div className="flex max-w-[85%] items-center gap-2 rounded-2xl rounded-bl-md bg-[hsl(var(--muted))] px-4 py-3 text-sm shadow-sm">
-        <Loader2 className="h-4 w-4 animate-spin text-[hsl(var(--muted-foreground))]" />
-        <span className="text-[hsl(var(--muted-foreground))]">正在生成代码...</span>
+      <div className="flex max-w-[85%] items-center gap-2 rounded-2xl rounded-bl-md bg-[hsl(var(--muted))] px-4 py-3 text-sm shadow-sm animate-pulse">
+        <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[hsl(var(--muted-foreground))]" />
+        <span className="text-[hsl(var(--muted-foreground))]">
+          正在生成代码
+          <span className="inline-flex">
+            <span className="animate-[typing_1.4s_ease-in-out_infinite]">.</span>
+            <span className="animate-[typing_1.4s_ease-in-out_0.2s_infinite]">.</span>
+            <span className="animate-[typing_1.4s_ease-in-out_0.4s_infinite]">.</span>
+          </span>
+        </span>
       </div>
     </div>
   );
