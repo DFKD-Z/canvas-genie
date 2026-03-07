@@ -19,12 +19,15 @@ const MODEL_OPTIONS = [
 ];
 
 interface ChatPanelProps {
+  messages: ChatMessageType[];
+  setMessages: React.Dispatch<React.SetStateAction<ChatMessageType[]>>;
   onCodeGenerated?: (code: GeneratedCode) => void;
+  /** 新聊天回调（移动端无侧栏时可在头部提供入口） */
+  onNewChat?: () => void;
   className?: string;
 }
 
-export function ChatPanel({ onCodeGenerated, className }: ChatPanelProps) {
-  const [messages, setMessages] = useState<ChatMessageType[]>([]);
+export function ChatPanel({ messages, setMessages, onCodeGenerated, onNewChat, className }: ChatPanelProps) {
   const [loading, setLoading] = useState(false);
   const [apiKey, setApiKey] = useState("");
   const [model, setModel] = useState("gpt-4o-mini");
@@ -100,13 +103,24 @@ export function ChatPanel({ onCodeGenerated, className }: ChatPanelProps) {
   return (
     <div className={cn("flex h-full flex-col bg-[hsl(var(--card))]", className)}>
       <div className="flex h-full flex-col">
-        <div className="shrink-0 border-b border-[hsl(var(--border))] bg-[hsl(var(--muted))]/40 px-5 py-4">
-          <h2 className="text-lg font-semibold tracking-tight text-[hsl(var(--foreground))]">
-            Canvas Genie
-          </h2>
-          <p className="mt-0.5 text-xs text-[hsl(var(--muted-foreground))]">
-            描述效果，AI 生成代码
-          </p>
+        <div className="flex shrink-0 items-center justify-between border-b border-[hsl(var(--border))] bg-[hsl(var(--muted))]/40 px-5 py-4">
+          <div>
+            <h2 className="text-lg font-semibold tracking-tight text-[hsl(var(--foreground))]">
+              Canvas Genie
+            </h2>
+            <p className="mt-0.5 text-xs text-[hsl(var(--muted-foreground))]">
+              描述效果，AI 生成代码
+            </p>
+          </div>
+          {onNewChat && (
+            <button
+              type="button"
+              onClick={onNewChat}
+              className="md:hidden rounded-lg px-3 py-1.5 text-xs font-medium text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))]"
+            >
+              新聊天
+            </button>
+          )}
         </div>
         <MessageList messages={messages} loading={loading} />
         <InputArea onSend={handleSend} disabled={loading} />

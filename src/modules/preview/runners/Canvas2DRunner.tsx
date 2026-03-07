@@ -13,6 +13,7 @@ export interface Canvas2DRunnerHandle {
 }
 
 const RUNNER_TARGET_ORIGIN = "*";
+const RUNNER_SRC = "/runners/canvas-runner.html?v=20260307-4";
 
 function sendCodeToRunner(iframe: HTMLIFrameElement | null, code: string) {
   if (!iframe?.contentWindow || !code) return;
@@ -85,7 +86,7 @@ export const Canvas2DRunner = forwardRef<Canvas2DRunnerHandle, Canvas2DRunnerPro
     return (
       <iframe
         ref={iframeRef}
-        src="/runners/canvas-runner.html"
+        src={RUNNER_SRC}
         title="Canvas 2D Preview"
         className={cn("h-full w-full border-0", className)}
         sandbox="allow-scripts"

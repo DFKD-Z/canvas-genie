@@ -13,6 +13,52 @@
 <body>
   <canvas id="canvas"></canvas>
   <script>
+    function normalizeUserCode(code) {
+      var raw = typeof code === 'string' ? code : '';
+      var text = raw.replace(/^\uFEFF/, '').trim();
+      if (!text) return '';
+
+      var fenceMatch = text.match(/```(?:javascript|js)?\s*([\s\S]*?)```/i);
+      if (fenceMatch && fenceMatch[1]) {
+        text = fenceMatch[1].trim();
+      } else {
+        text = text.replace(/^```[\w]*\n?/, '').replace(/\n?```\s*$/, '').trim();
+      }
+
+      if (text[0] === '{' && text.indexOf('"code"') !== -1) {
+        try {
+          var parsedObj = JSON.parse(text);
+          if (parsedObj && typeof parsedObj.code === 'string') {
+            text = parsedObj.code.trim();
+          }
+        } catch (_) {}
+      }
+
+      if ((text[0] === '"' && text[text.length - 1] === '"') || (text[0] === "'" && text[text.length - 1] === "'")) {
+        try {
+          if (text[0] === "'") {
+            text = '"' + text.slice(1, -1).replace(/\\'/g, "'").replace(/"/g, '\\"') + '"';
+          }
+          var parsedStr = JSON.parse(text);
+          if (typeof parsedStr === 'string') {
+            text = parsedStr.trim();
+          }
+        } catch (_) {}
+      }
+
+      // 兼容 `html + 脚本代码` 这类返回
+      var firstLine = (text.split('\n')[0] || '').trim();
+      if (/^html$/i.test(firstLine)) {
+        text = text.split('\n').slice(1).join('\n').trim();
+      }
+      var scriptMatch = text.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
+      if (scriptMatch && scriptMatch[1]) {
+        text = scriptMatch[1].trim();
+      }
+
+      return text;
+    }
+
     function runUserCode(canvas, code, retryCount) {
       retryCount = retryCount || 0;
       if (!canvas || typeof code !== 'string') return;
@@ -22,17 +68,31 @@
         requestAnimationFrame(function () { runUserCode(canvas, code, retryCount + 1); });
         return;
       }
+
       w = w || 300;
       h = h || 150;
       canvas.width = w;
       canvas.height = h;
+
+      var normalized = normalizeUserCode(code);
+      if (!normalized) return;
+
       try {
-        var ctx = canvas.getContext('2d');
-        if (ctx) eval(code);
-      } catch (err) {
-        console.error('[Canvas Genie]', err);
+        // Primary path: function body execution (strict mode compatible)
+        var fn = new Function('"use strict";\n' + normalized);
+        fn();
+      } catch (err1) {
+        try {
+          // Fallback: wrap in block for engines with strict body parsing quirks
+          var wrapped = '"use strict";\n{\n' + normalized + '\n}';
+          var wrappedFn = new Function(wrapped);
+          wrappedFn();
+        } catch (err2) {
+          console.error('[Canvas Genie]', err2, '\n[Code Preview]', normalized.slice(0, 240));
+        }
       }
     }
+
     window.addEventListener('message', function (e) {
       var canvas = document.getElementById('canvas');
       if (e.data?.type === 'RUN_CODE' && typeof e.data.code === 'string') {

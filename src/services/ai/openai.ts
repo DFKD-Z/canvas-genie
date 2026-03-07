@@ -5,11 +5,22 @@ import { SYSTEM_PROMPT_2D, buildUserPrompt } from "./prompts";
 
 function extractCodeFromResponse(content: string): string {
   const trimmed = content.trim();
-  const codeBlockMatch = trimmed.match(/```(?:javascript|js)\s*([\s\S]*?)```/i);
-  if (codeBlockMatch) return codeBlockMatch[1].trim();
-  const genericBlock = trimmed.match(/```\s*([\s\S]*?)```/);
-  if (genericBlock) return genericBlock[1].trim();
-  return trimmed;
+  const codeBlockMatch = trimmed.match(/```(?:[a-zA-Z0-9_-]+)?\s*([\s\S]*?)```/i);
+  const extracted = codeBlockMatch ? codeBlockMatch[1].trim() : trimmed;
+
+  // 兼容 AI 返回 HTML 模板，提取 <script> 内 JS
+  const scriptMatch = extracted.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
+  if (scriptMatch?.[1]) return scriptMatch[1].trim();
+
+  // 兼容 ```html 代码块被误提取为 "html\n<script>..."
+  if (/^html\s*$/i.test(extracted.split("\n")[0]?.trim() ?? "")) {
+    const withoutLang = extracted.split("\n").slice(1).join("\n").trim();
+    const nestedScript = withoutLang.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
+    if (nestedScript?.[1]) return nestedScript[1].trim();
+    return withoutLang;
+  }
+
+  return extracted;
 }
 
 export interface OpenAIAdapterOptions {

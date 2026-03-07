@@ -19,8 +19,8 @@ export default function CodePage() {
 
   if (code === null) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[hsl(var(--background))] p-6">
-        <p className="text-sm text-[hsl(var(--muted-foreground))]">
+      <div className="flex min-h-screen w-full items-center justify-center bg-black p-6">
+        <p className="text-sm text-neutral-400">
           请在主页面生成代码后点击「代码」按钮打开
         </p>
       </div>
@@ -28,17 +28,12 @@ export default function CodePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[hsl(var(--background))] p-4">
-      <div className="mx-auto max-w-4xl">
-        <h1 className="mb-4 text-lg font-semibold text-[hsl(var(--foreground))]">
-          生成代码
-        </h1>
-        <CodeBlock
-          code={code}
-          className="rounded-lg border border-[hsl(var(--border))]"
-          scrollHeight="70vh"
-        />
-      </div>
+    <div className="flex h-screen w-full flex-col bg-black">
+      <CodeBlock
+        code={code}
+        fill
+        className="rounded-none border-0"
+      />
     </div>
   );
 }

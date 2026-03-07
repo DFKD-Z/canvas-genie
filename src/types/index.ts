@@ -11,3 +11,13 @@ export interface ChatMessage {
   content: string;
   generatedCode?: GeneratedCode;
 }
+
+/** 单条聊天记录（用于 IndexedDB 持久化） */
+export interface ChatRecord {
+  id: string;
+  title: string;
+  messages: ChatMessage[];
+  generatedCode: GeneratedCode | null;
+  createdAt: number;
+  updatedAt: number;
+}

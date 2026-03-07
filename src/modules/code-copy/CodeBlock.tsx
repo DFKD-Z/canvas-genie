@@ -11,11 +11,18 @@ import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 interface CodeBlockProps {
   code: string;
   className?: string;
-  /** 代码区域最大高度，默认 200px */
+  /** 代码区域最大高度，默认 200px；当 fill 为 true 时忽略 */
   scrollHeight?: string;
+  /** 是否铺满父容器（标题栏 + 代码区占满高度） */
+  fill?: boolean;
 }
 
-export function CodeBlock({ code, className, scrollHeight = "200px" }: CodeBlockProps) {
+export function CodeBlock({
+  code,
+  className,
+  scrollHeight = "200px",
+  fill = false,
+}: CodeBlockProps) {
   const { copy, copied } = useCopyCode();
 
   const handleCopy = () => {
@@ -23,8 +30,14 @@ export function CodeBlock({ code, className, scrollHeight = "200px" }: CodeBlock
   };
 
   return (
-    <div className={cn("relative", className)}>
-      <div className="flex items-center justify-between border-b border-[hsl(var(--border))] bg-[hsl(var(--muted))]/50 px-3 py-2">
+    <div
+      className={cn(
+        "relative flex flex-col min-h-0",
+        fill && "h-full w-full",
+        className
+      )}
+    >
+      <div className="flex shrink-0 items-center justify-between border-b border-[hsl(var(--border))] bg-[hsl(var(--muted))]/50 px-3 py-2">
         <span className="text-xs font-medium text-[hsl(var(--muted-foreground))]">
           生成代码（可直接复制到项目）
         </span>
@@ -47,7 +60,10 @@ export function CodeBlock({ code, className, scrollHeight = "200px" }: CodeBlock
           )}
         </Button>
       </div>
-      <ScrollArea className="w-full" style={{ height: scrollHeight }}>
+      <ScrollArea
+        className={cn("w-full", fill && "min-h-0 flex-1")}
+        style={fill ? undefined : { height: scrollHeight }}
+      >
         <SyntaxHighlighter
           language="javascript"
           style={oneDark}

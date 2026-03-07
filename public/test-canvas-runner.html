@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Test Canvas Runner (const)</title>
+</head>
+<body>
+  <p>If you see a red square below and no console error, the runner accepts const.</p>
+  <iframe id="runner" src="/runners/canvas-runner.html" style="width:400px;height:300px;border:1px solid #ccc;"></iframe>
+  <script>
+    var code = [
+      "const canvas = document.getElementById('canvas');",
+      "const ctx = canvas.getContext('2d');",
+      "canvas.width = canvas.clientWidth || 300;",
+      "canvas.height = canvas.clientHeight || 150;",
+      "ctx.fillStyle = 'red';",
+      "ctx.fillRect(10, 10, 50, 50);"
+    ].join("\n");
+    var iframe = document.getElementById('runner');
+    iframe.onload = function () {
+      iframe.contentWindow.postMessage({ type: 'RUN_CODE', code: code }, '*');
+    };
+  </script>
+</body>
+</html>
