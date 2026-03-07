@@ -10,6 +10,7 @@ import type { ChatMessage } from "@/modules/chat/types";
 import {
   listChatRecords,
   saveChatRecord,
+  getChatRecord,
   deleteChatRecord,
   createRecordId,
   recordTitleFromMessages,
@@ -38,18 +39,24 @@ export default function Home() {
     setGenerated(code);
   }, []);
 
-  /** 新聊天：若有内容则先保存到 IndexedDB，再清空当前会话 */
+  /** 新聊天：若有内容则先保存到 IndexedDB（已有记录则更新同一条，不重复创建），再清空当前会话 */
   const handleNewChat = useCallback(async () => {
     const hasContent = messages.length > 0 || generated != null;
     if (hasContent) {
       try {
         const title = recordTitleFromMessages(messages);
+        const id = currentRecordId ?? createRecordId();
+        let createdAt = Date.now();
+        if (currentRecordId) {
+          const existing = await getChatRecord(currentRecordId);
+          if (existing) createdAt = existing.createdAt;
+        }
         await saveChatRecord({
-          id: createRecordId(),
+          id,
           title,
           messages,
           generatedCode: generated,
-          createdAt: Date.now(),
+          createdAt,
         });
       } catch (e) {
         console.error("Failed to save current chat:", e);
@@ -59,7 +66,7 @@ export default function Home() {
     setMessages([]);
     setGenerated(null);
     setCurrentRecordId(null);
-  }, [messages, generated, loadRecords]);
+  }, [messages, generated, currentRecordId, loadRecords]);
 
   /** 点击记录：从 IndexedDB 加载并恢复聊天与画布 */
   const handleSelectRecord = useCallback(async (record: ChatRecord) => {
