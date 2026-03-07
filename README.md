@@ -14,6 +14,8 @@
 | 右侧 iframe 内实时预览生成的 Canvas 2D 效果 | Live preview of generated Canvas 2D in an iframe on the right |
 | 支持多轮对话，可基于上下文迭代修改 | Multi-turn chat to refine results with context |
 | 一键复制代码，或跳转代码页查看完整代码 | One-click copy or open code page for full snippet |
+| 支持上传参考图（图+文）辅助生成 | Upload reference image (image + text) to guide generation |
+| 本地聊天记录（IndexedDB），可新建/切换/删除会话 | Local chat history (IndexedDB), new/switch/delete sessions |
 | 可选 API Key / 模型（含 GPT-4o、Qwen 等） | Optional API Key & model (GPT-4o, Qwen, etc.) |
 | 纯原生 Canvas 2D API，无第三方图形库 | Pure native Canvas 2D API, no external graphics libs |
 
@@ -49,6 +51,7 @@
 | **Next.js 14**（App Router）+ **TypeScript** | Next.js 14 (App Router) + TypeScript |
 | **Tailwind CSS** + **Radix/shadcn 风格** UI 组件 | Tailwind CSS + Radix/shadcn-style UI |
 | **OpenAI API**（可扩展为其他模型） | OpenAI API (extensible to other models) |
+| **IndexedDB**（本地会话历史） | IndexedDB (local session history) |
 | **Supabase**（预留，Phase 2 接入） | Supabase (reserved for Phase 2) |
 
 ---
@@ -117,24 +120,30 @@ Open **http://localhost:3000** in your browser.
 ```
 src/
 ├── app/                    # 页面与 API 路由 / Pages & API routes
-│   ├── page.tsx            # 首页（聊天 + 预览）/ Home (chat + preview)
+│   ├── page.tsx            # 首页（聊天 + 预览 + 记录列表）/ Home (chat + preview + records)
 │   ├── code/page.tsx       # 代码展示页 / Code view page
-│   ├── api/chat/route.ts   # 聊天生成接口 / Chat generation API
+│   ├── api/chat/route.ts   # 聊天生成接口（支持文本 + 参考图）/ Chat API (text + image)
 │   ├── layout.tsx
 │   └── globals.css
 ├── modules/
-│   ├── chat/               # 聊天模块（输入、消息列表、API 调用）/ Chat (input, messages, API)
-│   ├── preview/            # Canvas 预览与 2D/3D Runner / Canvas preview & runners
-│   └── code-copy/          # 代码展示与复制 / Code display & copy
-├── services/ai/            # AI 适配器与 Prompt / AI adapter & prompts
-│   ├── openai.ts           # OpenAI / 兼容 API 实现
-│   ├── adapter.ts          # 统一接口定义
-│   └── prompts.ts          # 系统与用户 Prompt
-├── components/             # 布局与 UI 组件 / Layout & UI components
+│   ├── chat/               # 聊天模块（输入、消息列表、参考图、API 调用）/ Chat (input, messages, image, API)
+│   ├── preview/            # Canvas 预览与 2D Runner / Canvas preview & Canvas2DRunner
+│   └── code-copy/          # 代码展示与一键复制 / Code display & one-click copy
+├── services/
+│   ├── ai/                 # AI 适配器与 Prompt / AI adapter & prompts
+│   │   ├── openai.ts       # OpenAI / 兼容 API 实现
+│   │   ├── adapter.ts      # 统一接口定义
+│   │   └── prompts.ts     # 系统与用户 Prompt
+│   └── storage/            # 本地存储 / Local storage
+│       └── chatRecordsDb.ts # IndexedDB 聊天记录持久化 / Chat records (IndexedDB)
+├── components/
+│   ├── layout/             # MainLayout 等 / MainLayout, etc.
+│   ├── chat/               # RecordList 会话列表 / RecordList (session list)
+│   └── ui/                 # 通用 UI（Button、Card、ScrollArea 等）/ Shared UI (Button, Card, etc.)
 ├── lib/                    # 工具与 Supabase 客户端 / Utils & Supabase client
 └── types/                  # 全局类型 / Global types
 public/
-└── runners/               # iframe 内执行生成代码的 runner 页面 / Runner pages for generated code
+└── runners/                # iframe 内执行生成代码的 runner 页面 / Runner pages for generated code
 ```
 
 ---
@@ -143,8 +152,8 @@ public/
 
 | 阶段 Phase | 中文 | English |
 |------------|------|--------|
-| **Phase 1**（当前） | 2D Canvas 生成、实时预览、一键复制 | 2D Canvas generation, live preview, one-click copy |
-| **Phase 2** | Supabase 鉴权、历史记录与收藏 | Supabase auth, history & favorites |
+| **Phase 1**（当前） | 2D Canvas 生成、实时预览、一键复制、参考图、本地会话历史（IndexedDB） | 2D Canvas, live preview, copy, reference image, local session history (IndexedDB) |
+| **Phase 2** | Supabase 鉴权、云端历史与收藏 | Supabase auth, cloud history & favorites |
 | **Phase 3** | 3D（Three.js）支持 | 3D (Three.js) support |
 | **Phase 4** | 分享链接等 | Share links, etc. |
 
