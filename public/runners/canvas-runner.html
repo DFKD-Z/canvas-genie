@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Canvas Runner</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; }
+    #canvas { display: block; width: 100%; height: 100%; }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+  <script>
+    function runUserCode(canvas, code, retryCount) {
+      retryCount = retryCount || 0;
+      if (!canvas || typeof code !== 'string') return;
+      var w = canvas.clientWidth;
+      var h = canvas.clientHeight;
+      if ((w === 0 || h === 0) && retryCount < 20) {
+        requestAnimationFrame(function () { runUserCode(canvas, code, retryCount + 1); });
+        return;
+      }
+      w = w || 300;
+      h = h || 150;
+      canvas.width = w;
+      canvas.height = h;
+      try {
+        var ctx = canvas.getContext('2d');
+        if (ctx) eval(code);
+      } catch (err) {
+        console.error('[Canvas Genie]', err);
+      }
+    }
+    window.addEventListener('message', function (e) {
+      var canvas = document.getElementById('canvas');
+      if (e.data?.type === 'RUN_CODE' && typeof e.data.code === 'string') {
+        requestAnimationFrame(function () {
+          runUserCode(canvas, e.data.code);
+        });
+      } else if (e.data?.type === 'GET_IMAGE' && e.source) {
+        try {
+          var dataUrl = canvas ? canvas.toDataURL('image/png') : '';
+          e.source.postMessage({ type: 'IMAGE_DATA', dataUrl: dataUrl }, e.origin);
+        } catch (err) {
+          e.source.postMessage({ type: 'IMAGE_DATA', dataUrl: '', error: String(err) }, e.origin);
+        }
+      }
+    });
+  </script>
+</body>
+</html>
