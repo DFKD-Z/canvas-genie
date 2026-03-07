@@ -19,6 +19,29 @@
 
 ---
 
+## 生成类型 / Generated Output Types
+
+经实测，本工具可根据自然语言描述生成以下类型的 Canvas 2D 内容：
+
+**Verified use cases** — the tool can generate the following types of Canvas 2D output from natural language:
+
+| 类型 Type | 说明 Description |
+|-----------|------------------|
+| **Canvas 游戏** | 小游戏（如弹球、打砖块、简单动画交互等） |
+| **Canvas Games** | Mini games (e.g. bouncing ball, breakout, simple interactive animations) |
+| **Logo** | 品牌 Logo、图标、标识等矢量风格图形 |
+| **Logo** | Brand logos, icons, marks in vector-style graphics |
+| **静态图片** | 插画、图表、几何图形、文字排版等静态画面 |
+| **Static Images** | Illustrations, charts, geometric shapes, typography, static scenes |
+| **动态图片** | 动画、粒子效果、渐变流动、过渡动画等动态效果 |
+| **Dynamic Images** | Animations, particle effects, gradient flows, transition effects |
+
+描述时尽量具体（如「一个蓝色圆形 Logo，带渐变」「红色小球左右弹跳，碰到边缘反弹」），生成效果更佳。
+
+*Tip: Be specific in your description (e.g. “a blue circular logo with gradient”, “a red ball bouncing left and right off edges”) for better results.*
+
+---
+
 ## 技术栈 / Tech Stack
 
 | 中文 | English |
