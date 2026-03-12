@@ -16,6 +16,8 @@ export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
+  /** 思考/推理过程，仅 assistant 可能有 */
+  reasoning?: string;
   /** data URL，便于 IndexedDB 序列化与展示 */
   imageDataUrl?: string;
   generatedCode?: GeneratedCode;

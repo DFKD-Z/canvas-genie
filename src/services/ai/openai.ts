@@ -113,5 +113,76 @@ export function createOpenAIAdapter(options?: OpenAIAdapterOptions): AIAdapter {
         throw err;
       }
     },
+
+    async streamCanvasCode(
+      userMessage: string,
+      conversationHistory?: { role: string; content: string }[],
+      currentCode?: string,
+      imageDataUrl?: string,
+      onChunk?: (type: "content" | "reasoning", text: string) => void
+    ) {
+      if (isQwen && !baseURL) {
+        throw new Error(
+          "使用 Qwen 模型时请在 .env.local 中设置 OPENAI_BASE_URL，例如：OPENAI_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1"
+        );
+      }
+
+      const hasImage = typeof imageDataUrl === "string" && imageDataUrl.startsWith("data:image/");
+      const textContent = buildUserPrompt(userMessage, currentCode, hasImage);
+      const userContent: string | OpenAI.Chat.ChatCompletionContentPart[] = hasImage
+        ? [
+            { type: "text", text: textContent },
+            { type: "image_url", image_url: { url: imageDataUrl, detail: "auto" } },
+          ]
+        : textContent;
+
+      const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+        { role: "system", content: SYSTEM_PROMPT_2D },
+        ...(conversationHistory ?? []).map((m) => ({
+          role: m.role as "user" | "assistant",
+          content: m.content,
+        })),
+        { role: "user", content: userContent },
+      ];
+
+      try {
+        const stream = await openai.chat.completions.create({
+          model,
+          messages,
+          temperature: 0.3,
+          stream: true,
+        });
+
+        let fullContent = "";
+        for await (const chunk of stream) {
+          const delta = chunk.choices[0]?.delta as { content?: string; reasoning_content?: string } | undefined;
+          if (!delta) continue;
+          if (typeof delta.content === "string" && delta.content) {
+            fullContent += delta.content;
+            onChunk?.("content", delta.content);
+          }
+          if (typeof delta.reasoning_content === "string" && delta.reasoning_content) {
+            onChunk?.("reasoning", delta.reasoning_content);
+          }
+        }
+
+        const extracted = extractCodeFromResponse(fullContent);
+        if (!extracted) {
+          return { message: fullContent.trim() || "未返回内容。" };
+        }
+        if (!looksLikeJavaScript(extracted)) {
+          return { message: fullContent.trim() };
+        }
+        return { code: extracted, type: "2d" as const };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg.includes("Connection error") || msg.includes("ECONNREFUSED") || msg.includes("fetch failed")) {
+          throw new Error(
+            `连接失败：请检查 OPENAI_BASE_URL 是否设为 DashScope 地址（如 https://dashscope.aliyuncs.com/compatible-mode/v1）、网络与防火墙，以及 OPENAI_API_KEY 是否为百炼 API Key。原始错误：${msg}`
+          );
+        }
+        throw err;
+      }
+    },
   };
 }

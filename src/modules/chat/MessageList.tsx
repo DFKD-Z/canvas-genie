@@ -1,9 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { ChatMessage as ChatMessageType } from "./types";
 import { cn } from "@/lib/utils";
-import { Sparkles, Loader2 } from "lucide-react";
+import { Sparkles, Loader2, ChevronDown, ChevronRight } from "lucide-react";
 
 interface MessageListProps {
   messages: ChatMessageType[];
@@ -17,7 +18,7 @@ function LoadingBubble() {
       <div className="flex max-w-[85%] items-center gap-2 rounded-2xl rounded-bl-md bg-[hsl(var(--muted))] px-4 py-3 text-sm shadow-sm animate-pulse">
         <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[hsl(var(--muted-foreground))]" />
         <span className="text-[hsl(var(--muted-foreground))]">
-          正在生成代码
+          正在生成预览
           <span className="inline-flex">
             <span className="animate-[typing_1.4s_ease-in-out_infinite]">.</span>
             <span className="animate-[typing_1.4s_ease-in-out_0.2s_infinite]">.</span>
@@ -25,6 +26,31 @@ function LoadingBubble() {
           </span>
         </span>
       </div>
+    </div>
+  );
+}
+
+function ReasoningBlock({ reasoning }: { reasoning: string }) {
+  const [open, setOpen] = useState(true);
+  const trimmed = reasoning.trim();
+  if (!trimmed) return null;
+  return (
+    <div className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted))]/50 overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]/70"
+      >
+        {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+        思考过程
+      </button>
+      {open && (
+        <div className="max-h-48 overflow-y-auto border-t border-[hsl(var(--border))] px-3 py-2">
+          <p className="whitespace-pre-wrap text-xs leading-relaxed text-[hsl(var(--muted-foreground))]">
+            {trimmed}
+          </p>
+        </div>
+      )}
     </div>
   );
 }
@@ -76,8 +102,20 @@ export function MessageList({ messages, loading = false, className }: MessageLis
                   className="max-h-32 rounded-lg object-contain"
                 />
               )}
-              {(msg.content?.trim() ?? "") && (
+              {msg.role === "assistant" && (msg.reasoning?.trim() ?? "") && (
+                <ReasoningBlock reasoning={msg.reasoning ?? ""} />
+              )}
+              {msg.role === "user" && (msg.content?.trim() ?? "") && (
                 <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+              )}
+              {msg.role === "assistant" && !msg.generatedCode && (msg.content?.trim() ?? "") && (
+                <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+              )}
+              {msg.role === "assistant" && msg.generatedCode && (
+                <p className="text-sm text-[hsl(var(--muted-foreground))]">已经完成</p>
+              )}
+              {msg.role === "assistant" && !(msg.content?.trim() ?? "") && !msg.generatedCode && loading && (
+                <p className="text-sm text-[hsl(var(--muted-foreground))] animate-pulse">正在生成预览…</p>
               )}
               {msg.role === "user" && msg.imageDataUrl && !msg.content?.trim() && (
                 <p className="text-xs opacity-80">根据图片生成</p>
@@ -85,7 +123,9 @@ export function MessageList({ messages, loading = false, className }: MessageLis
             </div>
           </div>
         ))}
-        {loading && <LoadingBubble />}
+        {loading && (messages.length === 0 || messages[messages.length - 1]?.role !== "assistant") && (
+          <LoadingBubble />
+        )}
       </div>
     </ScrollArea>
   );

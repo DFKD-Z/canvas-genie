@@ -5,7 +5,8 @@ import { MessageList } from "./MessageList";
 import { InputArea } from "./InputArea";
 import { cn } from "@/lib/utils";
 import type { ChatMessage as ChatMessageType } from "./types";
-import type { GeneratedCode } from "@/types";
+import type { StreamEvent } from "./types";
+import type { ChatApiResponse, GeneratedCode } from "@/types";
 import { isCodeResponse } from "@/types";
 
 const STORAGE_KEY_API = "canvas-genie-apiKey";
@@ -60,53 +61,121 @@ export function ChatPanel({ messages, setMessages, onCodeGenerated, onNewChat, c
       };
       setMessages((prev) => [...prev, userMsg]);
       setLoading(true);
+      const history = messages.map((m) => {
+        if (m.role === "assistant" && m.generatedCode?.code) {
+          return {
+            role: m.role,
+            content: `已生成 Canvas 代码：\n\n\`\`\`javascript\n${m.generatedCode.code}\n\`\`\``,
+          };
+        }
+        const text = m.content?.trim() || (m.imageDataUrl ? "[附一张参考图]" : "");
+        return { role: m.role, content: text };
+      });
+      const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant" && m.generatedCode?.code);
+      const currentCode = lastAssistant?.generatedCode?.code;
+      const body: Record<string, unknown> = { message: content, history, stream: true };
+      if (imageDataUrl) body.imageDataUrl = imageDataUrl;
+      if (currentCode) body.currentCode = currentCode;
+      if (apiKey.trim()) body.apiKey = apiKey.trim();
+      if (model) body.model = model;
+
       try {
-        const history = messages.map((m) => {
-          if (m.role === "assistant" && m.generatedCode?.code) {
-            return {
-              role: m.role,
-              content: `已生成 Canvas 代码：\n\n\`\`\`javascript\n${m.generatedCode.code}\n\`\`\``,
-            };
-          }
-          const text = m.content?.trim() || (m.imageDataUrl ? "[附一张参考图]" : "");
-          return { role: m.role, content: text };
-        });
-        const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant" && m.generatedCode?.code);
-        const currentCode = lastAssistant?.generatedCode?.code;
-        const body: Record<string, unknown> = { message: content, history };
-        if (imageDataUrl) body.imageDataUrl = imageDataUrl;
-        if (currentCode) body.currentCode = currentCode;
-        if (apiKey.trim()) body.apiKey = apiKey.trim();
-        if (model) body.model = model;
         const res = await fetch("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
         });
-        const json = await res.json();
-        if (json.code !== 0 || !json.data) {
-          throw new Error(json.msg || "Request failed");
-        }
-        const data = json.data as { message?: string; code?: string; type?: "2d" | "3d" };
-        if (isCodeResponse(data)) {
-          const code = data.code;
-          const type = data.type ?? "2d";
+
+        const contentType = res.headers.get("Content-Type") ?? "";
+        if (contentType.includes("text/event-stream") && res.body) {
+          const assistantId = `assistant-${Date.now()}`;
           const assistantMsg: ChatMessageType = {
-            id: `assistant-${Date.now()}`,
+            id: assistantId,
             role: "assistant",
-            content: "已生成 Canvas 代码，请在右侧查看预览并复制。",
-            generatedCode: { code, type },
+            content: "",
+            reasoning: "",
           };
           setMessages((prev) => [...prev, assistantMsg]);
-          onCodeGenerated?.({ code, type });
+
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = "";
+          const processLine = (line: string) => {
+            if (!line.startsWith("data: ")) return;
+            const raw = line.slice(6).trim();
+            if (raw === "[DONE]") return;
+            try {
+              const event = JSON.parse(raw) as StreamEvent;
+              if (event.t === "content") {
+                // 不在消息列表展示代码，仅服务端用于提取代码，此处不更新 content
+              } else if (event.t === "reasoning" && "v" in event) {
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === assistantId ? { ...m, reasoning: (m.reasoning ?? "") + event.v } : m
+                  )
+                );
+              } else if (event.t === "done") {
+                setMessages((prev) =>
+                  prev.map((m) => {
+                    if (m.id !== assistantId) return m;
+                    const next = { ...m };
+                    if ("code" in event && event.code) {
+                      next.generatedCode = { code: event.code, type: event.type ?? "2d" };
+                      next.content = "已经完成";
+                      onCodeGenerated?.({ code: event.code, type: event.type ?? "2d" });
+                    } else if ("message" in event && event.message) {
+                      next.content = next.content?.trim() || event.message;
+                    }
+                    return next;
+                  })
+                );
+              }
+            } catch {
+              // 忽略非 JSON 的 data 行
+            }
+          };
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const parts = buffer.split("\n\n");
+            buffer = parts.pop() ?? "";
+            for (const part of parts) {
+              const line = part.split("\n").find((l) => l.startsWith("data:"));
+              if (line) processLine(line);
+            }
+          }
+          if (buffer) {
+            const line = buffer.split("\n").find((l) => l.startsWith("data:"));
+            if (line) processLine(line);
+          }
         } else {
-          const text = typeof data.message === "string" ? data.message.trim() : "";
-          const assistantMsg: ChatMessageType = {
-            id: `assistant-${Date.now()}`,
-            role: "assistant",
-            content: text || "未返回内容。",
-          };
-          setMessages((prev) => [...prev, assistantMsg]);
+          const json = await res.json();
+          if (json.code !== 0 || !json.data) {
+            throw new Error(json.msg || "Request failed");
+          }
+          const data = json.data as ChatApiResponse;
+          if (isCodeResponse(data)) {
+            const code = data.code;
+            const type = data.type ?? "2d";
+            const assistantMsg: ChatMessageType = {
+              id: `assistant-${Date.now()}`,
+              role: "assistant",
+              content: "已经完成",
+              generatedCode: { code, type },
+            };
+            setMessages((prev) => [...prev, assistantMsg]);
+            onCodeGenerated?.({ code, type });
+          } else {
+            const text = typeof data.message === "string" ? data.message.trim() : "";
+            const assistantMsg: ChatMessageType = {
+              id: `assistant-${Date.now()}`,
+              role: "assistant",
+              content: text || "未返回内容。",
+            };
+            setMessages((prev) => [...prev, assistantMsg]);
+          }
         }
       } catch (err) {
         const errMsg: ChatMessageType = {
