@@ -5,6 +5,13 @@ export interface GeneratedCode {
   type: CanvasCodeType;
 }
 
+/** API 返回：纯文本互动（如分段询问）或生成的代码 */
+export type ChatApiResponse = { message: string } | GeneratedCode;
+
+export function isCodeResponse(data: ChatApiResponse | null): data is GeneratedCode {
+  return data != null && "code" in data && typeof (data as GeneratedCode).code === "string";
+}
+
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant";

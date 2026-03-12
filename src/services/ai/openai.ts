@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import type { AIAdapter } from "./adapter";
-import type { GeneratedCode } from "@/types";
+import type { ChatApiResponse } from "@/types";
 import { SYSTEM_PROMPT_2D, buildUserPrompt } from "./prompts";
 
 function extractCodeFromResponse(content: string): string {
@@ -21,6 +21,20 @@ function extractCodeFromResponse(content: string): string {
   }
 
   return extracted;
+}
+
+/** 判断内容是否像可执行的 Canvas JS（避免把纯文本回复当代码执行） */
+function looksLikeJavaScript(text: string): boolean {
+  const t = text.trim();
+  if (!t || t.length < 20) return false;
+  const firstLines = t.split(/\r?\n/).slice(0, 5).join(" ");
+  const hasJsToken =
+    /\b(const|let|var|function)\b/.test(firstLines) ||
+    /\b(canvas|getContext|getElementById)\b/.test(firstLines) ||
+    /\brequestAnimationFrame\b/.test(firstLines) ||
+    /^\s*[\w.]+\s*=\s*document\./.test(t);
+  const mostlyCjk = (t.match(/[\u4e00-\u9fff\u3000-\u303f]/g)?.length ?? 0) > t.length * 0.3;
+  return hasJsToken && !mostlyCjk;
 }
 
 export interface OpenAIAdapterOptions {
@@ -81,11 +95,14 @@ export function createOpenAIAdapter(options?: OpenAIAdapterOptions): AIAdapter {
           temperature: 0.3,
         });
         const raw = completion.choices[0]?.message?.content ?? "";
-        const code = extractCodeFromResponse(raw);
-        if (!code) {
-          throw new Error("AI did not return valid code");
+        const extracted = extractCodeFromResponse(raw);
+        if (!extracted) {
+          return { message: raw.trim() || "未返回内容。" };
         }
-        return { code, type: "2d" as const };
+        if (!looksLikeJavaScript(extracted)) {
+          return { message: raw.trim() };
+        }
+        return { code: extracted, type: "2d" as const };
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         if (msg.includes("Connection error") || msg.includes("ECONNREFUSED") || msg.includes("fetch failed")) {

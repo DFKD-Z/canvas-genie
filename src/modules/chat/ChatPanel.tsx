@@ -6,6 +6,7 @@ import { InputArea } from "./InputArea";
 import { cn } from "@/lib/utils";
 import type { ChatMessage as ChatMessageType } from "./types";
 import type { GeneratedCode } from "@/types";
+import { isCodeResponse } from "@/types";
 
 const STORAGE_KEY_API = "canvas-genie-apiKey";
 const STORAGE_KEY_MODEL = "canvas-genie-model";
@@ -86,17 +87,27 @@ export function ChatPanel({ messages, setMessages, onCodeGenerated, onNewChat, c
         if (json.code !== 0 || !json.data) {
           throw new Error(json.msg || "Request failed");
         }
-        const data = json.data as GeneratedCode;
-        const code = data?.code ?? "";
-        const type = data?.type ?? "2d";
-        const assistantMsg: ChatMessageType = {
-          id: `assistant-${Date.now()}`,
-          role: "assistant",
-          content: "已生成 Canvas 代码，请在右侧查看预览并复制。",
-          generatedCode: { code, type },
-        };
-        setMessages((prev) => [...prev, assistantMsg]);
-        onCodeGenerated?.({ code, type });
+        const data = json.data as { message?: string; code?: string; type?: "2d" | "3d" };
+        if (isCodeResponse(data)) {
+          const code = data.code;
+          const type = data.type ?? "2d";
+          const assistantMsg: ChatMessageType = {
+            id: `assistant-${Date.now()}`,
+            role: "assistant",
+            content: "已生成 Canvas 代码，请在右侧查看预览并复制。",
+            generatedCode: { code, type },
+          };
+          setMessages((prev) => [...prev, assistantMsg]);
+          onCodeGenerated?.({ code, type });
+        } else {
+          const text = typeof data.message === "string" ? data.message.trim() : "";
+          const assistantMsg: ChatMessageType = {
+            id: `assistant-${Date.now()}`,
+            role: "assistant",
+            content: text || "未返回内容。",
+          };
+          setMessages((prev) => [...prev, assistantMsg]);
+        }
       } catch (err) {
         const errMsg: ChatMessageType = {
           id: `error-${Date.now()}`,

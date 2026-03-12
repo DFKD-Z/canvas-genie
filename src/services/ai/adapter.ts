@@ -1,4 +1,4 @@
-import type { GeneratedCode } from "@/types";
+import type { ChatApiResponse } from "@/types";
 
 export interface AIAdapter {
   generateCanvasCode(
@@ -6,5 +6,5 @@ export interface AIAdapter {
     conversationHistory?: { role: string; content: string }[],
     currentCode?: string,
     imageDataUrl?: string
-  ): Promise<GeneratedCode>;
+  ): Promise<ChatApiResponse>;
 }
