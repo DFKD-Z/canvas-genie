@@ -4,6 +4,7 @@ import { useCallback } from "react";
 import { MessageSquarePlus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ChatRecord } from "@/types";
+import { SidebarUserBlock } from "./SidebarUserBlock";
 
 function formatRecordTime(ts: number): string {
   const d = new Date(ts);
@@ -100,6 +101,7 @@ export function RecordList({
           </ul>
         )}
       </div>
+      <SidebarUserBlock />
     </div>
   );
 }

@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { RecordList } from "@/components/chat/RecordList";
 import { ChatPanel } from "@/modules/chat/ChatPanel";
 import { CanvasPreview } from "@/modules/preview/CanvasPreview";
+import { useAuthStore } from "@/store/auth";
 import type { GeneratedCode, ChatRecord } from "@/types";
 import type { ChatMessage } from "@/modules/chat/types";
 import {
@@ -17,10 +19,18 @@ import {
 } from "@/services/storage/chatRecordsDb";
 
 export default function Home() {
+  const router = useRouter();
+  const { user, hasHydrated } = useAuthStore();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [generated, setGenerated] = useState<GeneratedCode | null>(null);
   const [currentRecordId, setCurrentRecordId] = useState<string | null>(null);
   const [records, setRecords] = useState<ChatRecord[]>([]);
+
+  useEffect(() => {
+    if (hasHydrated && user == null) {
+      router.replace("/login");
+    }
+  }, [hasHydrated, user, router]);
 
   const loadRecords = useCallback(async () => {
     try {
@@ -120,6 +130,14 @@ export default function Home() {
     },
     [currentRecordId, loadRecords]
   );
+
+  if (!hasHydrated || user == null) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-[hsl(var(--background))]">
+        <p className="text-sm text-[hsl(var(--muted-foreground))]">加载中…</p>
+      </div>
+    );
+  }
 
   const sidebar = (
     <RecordList

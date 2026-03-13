@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { AuthHydrate } from "@/components/auth/AuthHydrate";
 
 export const metadata: Metadata = {
   title: "Canvas Genie",
@@ -13,7 +14,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="zh-CN">
-      <body className="min-h-screen antialiased">{children}</body>
+      <body className="min-h-screen antialiased">
+        <AuthHydrate>{children}</AuthHydrate>
+      </body>
     </html>
   );
 }
