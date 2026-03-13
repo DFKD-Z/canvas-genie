@@ -1,21 +1,3 @@
-// export const SYSTEM_PROMPT_2D = `You are an expert at writing browser 2D Canvas code. The user will describe what they want to draw or animate, and may optionally provide a reference image. If the user provides a reference image, use its layout, colors, or composition to generate or adapt the Canvas code, and combine with any text description they give.
-
-// Rules:
-// 1. Output ONLY valid JavaScript code that runs in the browser. No markdown code fences, no explanation.
-// 2. Use only the native Canvas 2D API. Assume a single <canvas> element with id "canvas" already exists in the DOM.
-// 3. Get context with: const canvas = document.getElementById('canvas'); const ctx = canvas.getContext('2d');
-// 4. Set canvas width/height from container: canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight;
-// 5. No external libraries. No Node.js or require/import.
-// 6. Code must be self-contained and run when executed. Use requestAnimationFrame for animations.
-// 7. Respond with the raw code only.
-// 8. If the user provides "current code" or the conversation history contains code you previously generated, you MUST do incremental edits only: keep the existing style and structure, and only add or modify what the user asks for. Do not rewrite the entire canvas from scratch.`;
-
-/**
- * ROLE: Senior Browser 2D Canvas Engineer & Creative Technologist
- * GOAL: Write high-performance, aesthetically pleasing, and responsive native Canvas code.
- * System prompt content is loaded from ./system-prompt-2d.md
- */
-
 import fs from "fs";
 import path from "path";
 
@@ -29,7 +11,7 @@ function loadSystemPrompt2D(): string {
   }
 }
 
-function loadRequirementAnalysisPrompt(): string {
+function loadRequirementAnalysisPromptTemplate(): string {
   try {
     const dir = path.join(process.cwd(), "src", "services", "ai");
     const filePath = path.join(dir, "requirement-analysis-prompt.md");
@@ -39,8 +21,19 @@ function loadRequirementAnalysisPrompt(): string {
   }
 }
 
+/** 构建需求分析用 system prompt，替换模板中的 {{USER_DESCRIPTION}} 与 {{REFERENCE_IMAGE}} */
+export function buildRequirementAnalysisPrompt(userDescription: string, hasReferenceImage: boolean): string {
+  const template = loadRequirementAnalysisPromptTemplate();
+  const description = userDescription.trim() || (hasReferenceImage ? "（用户未填写文字，请主要根据参考图理解需求。）" : "（用户未填写文字描述。）");
+  const referenceImageNote = hasReferenceImage
+    ? "用户已上传参考图，将在下方用户消息中以图片形式提供，请结合图片与文字描述进行分析。"
+    : "本次未提供参考图，请仅根据用户描述进行分析。";
+  return template
+    .replace(/\{\{USER_DESCRIPTION\}\}/g, description)
+    .replace(/\{\{REFERENCE_IMAGE\}\}/g, referenceImageNote);
+}
+
 export const SYSTEM_PROMPT_2D = loadSystemPrompt2D();
-export const REQUIREMENT_ANALYSIS_SYSTEM_PROMPT = loadRequirementAnalysisPrompt();
 
 export function buildUserPrompt(description: string, currentCode?: string, hasImage?: boolean): string {
   const userPart = description.trim() || (hasImage ? "Generate 2D Canvas code based on the reference image." : "Generate 2D Canvas code.");
