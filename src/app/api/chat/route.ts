@@ -19,6 +19,7 @@ export async function POST(request: NextRequest) {
       currentCode,
       apiKey,
       model,
+      baseURL,
       imageDataUrl,
       stream: useStream,
       step,
@@ -29,6 +30,7 @@ export async function POST(request: NextRequest) {
       currentCode?: string;
       apiKey?: string;
       model?: string;
+      baseURL?: string;
       imageDataUrl?: string;
       stream?: boolean;
       step?: "analyze" | "generate";
@@ -54,9 +56,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const adapter = createOpenAIAdapter(
-      apiKey || model ? { ...(apiKey && { apiKey }), ...(model && { model }) } : undefined
-    );
+    const adapterOptions: { apiKey?: string; model?: string; baseURL?: string } | undefined =
+      apiKey || model || baseURL
+        ? {
+            ...(typeof apiKey === "string" && apiKey.trim() && { apiKey: apiKey.trim() }),
+            ...(typeof model === "string" && model.trim() && { model: model.trim() }),
+            ...(typeof baseURL === "string" && baseURL.trim() && { baseURL: baseURL.trim() }),
+          }
+        : undefined;
+    const adapter = createOpenAIAdapter(adapterOptions);
 
     if (isAnalyze && adapter.analyzeRequirement) {
       const result = await adapter.analyzeRequirement(msg, history, hasImage ? imageDataUrl : undefined);

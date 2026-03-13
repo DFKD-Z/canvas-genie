@@ -10,7 +10,12 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { useModelStore, MODEL_OPTIONS } from "@/store/model";
+import {
+  useModelStore,
+  MODEL_OPTIONS,
+  modelNeedsCustomBaseUrl,
+  DEFAULT_BASE_URL_QWEN,
+} from "@/store/model";
 
 interface ModelConfigModalProps {
   open: boolean;
@@ -18,9 +23,10 @@ interface ModelConfigModalProps {
 }
 
 export function ModelConfigModal({ open, onOpenChange }: ModelConfigModalProps) {
-  const { model, apiKey, setModel, setApiKey } = useModelStore();
+  const { model, apiKey, baseURL, setModel, setApiKey, setBaseURL } = useModelStore();
   const [localModel, setLocalModel] = useState(model);
   const [localApiKey, setLocalApiKey] = useState(apiKey);
+  const [localBaseURL, setLocalBaseURL] = useState(baseURL);
   const [testStatus, setTestStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [testMessage, setTestMessage] = useState("");
   const [modelChanged, setModelChanged] = useState(false);
@@ -29,17 +35,21 @@ export function ModelConfigModal({ open, onOpenChange }: ModelConfigModalProps) 
     if (open) {
       setLocalModel(model);
       setLocalApiKey(apiKey);
+      setLocalBaseURL(baseURL);
       setTestStatus("idle");
       setTestMessage("");
       setModelChanged(false);
     }
-  }, [open, model, apiKey]);
+  }, [open, model, apiKey, baseURL]);
 
   const handleModelChange = useCallback((v: string) => {
     setLocalModel(v);
     setModelChanged(true);
     setTestStatus("idle");
     setTestMessage("");
+    if (modelNeedsCustomBaseUrl(v)) {
+      setLocalBaseURL((prev) => (prev.trim() ? prev : DEFAULT_BASE_URL_QWEN));
+    }
   }, []);
 
   const handleTestConnection = useCallback(async () => {
@@ -55,7 +65,11 @@ export function ModelConfigModal({ open, onOpenChange }: ModelConfigModalProps) 
       const res = await fetch("/api/model/test", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ apiKey: keyToUse, model: localModel }),
+        body: JSON.stringify({
+          apiKey: keyToUse,
+          model: localModel,
+          ...(localBaseURL.trim() && { baseURL: localBaseURL.trim() }),
+        }),
       });
       const json = await res.json();
       if (json.code === 0) {
@@ -69,15 +83,18 @@ export function ModelConfigModal({ open, onOpenChange }: ModelConfigModalProps) 
       setTestStatus("error");
       setTestMessage(err instanceof Error ? err.message : "请求失败");
     }
-  }, [localApiKey, localModel]);
+  }, [localApiKey, localModel, localBaseURL]);
 
   const handleSave = useCallback(() => {
     setModel(localModel);
     setApiKey(localApiKey.trim());
+    setBaseURL(localBaseURL.trim());
     onOpenChange(false);
-  }, [localModel, localApiKey, setModel, setApiKey, onOpenChange]);
+  }, [localModel, localApiKey, localBaseURL, setModel, setApiKey, setBaseURL, onOpenChange]);
 
   const needApiKeyPrompt = modelChanged && !localApiKey.trim();
+  const needBaseUrlPrompt =
+    modelChanged && modelNeedsCustomBaseUrl(localModel) && !localBaseURL.trim();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -108,6 +125,35 @@ export function ModelConfigModal({ open, onOpenChange }: ModelConfigModalProps) 
           </div>
           <div className="flex flex-col gap-2">
             <label
+              htmlFor="model-config-baseurl"
+              className="text-xs font-medium text-[hsl(var(--muted-foreground))]"
+            >
+              Base URL
+            </label>
+            <input
+              id="model-config-baseurl"
+              type="url"
+              placeholder={
+                modelNeedsCustomBaseUrl(localModel)
+                  ? DEFAULT_BASE_URL_QWEN
+                  : "可选，OpenAI 默认；Qwen 需填 DashScope 地址"
+              }
+              value={localBaseURL}
+              onChange={(e) => {
+                setLocalBaseURL(e.target.value);
+                setTestStatus("idle");
+                setTestMessage("");
+              }}
+              className="h-9 w-full rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 text-sm text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))]"
+            />
+            {modelNeedsCustomBaseUrl(localModel) && (
+              <p className="text-xs text-[hsl(var(--muted-foreground))]">
+                使用 Qwen 时需填写阿里云 DashScope 兼容地址
+              </p>
+            )}
+          </div>
+          <div className="flex flex-col gap-2">
+            <label
               htmlFor="model-config-apikey"
               className="text-xs font-medium text-[hsl(var(--muted-foreground))]"
             >
@@ -129,6 +175,11 @@ export function ModelConfigModal({ open, onOpenChange }: ModelConfigModalProps) 
           {needApiKeyPrompt && (
             <p className="text-xs text-[hsl(var(--destructive))]">
               请填写该模型的 API Key 并点击「测试连接」
+            </p>
+          )}
+          {needBaseUrlPrompt && (
+            <p className="text-xs text-[hsl(var(--destructive))]">
+              使用 Qwen 模型时请填写 Base URL（如 DashScope 兼容地址）并点击「测试连接」
             </p>
           )}
           {testMessage && (

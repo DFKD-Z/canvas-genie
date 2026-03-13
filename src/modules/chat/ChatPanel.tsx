@@ -24,6 +24,7 @@ export function ChatPanel({ messages, setMessages, onCodeGenerated, onNewChat, c
   const sendingRef = useRef(false);
   const apiKey = useModelStore((s) => s.apiKey);
   const model = useModelStore((s) => s.model);
+  const baseURL = useModelStore((s) => s.baseURL);
 
   const buildHistory = useCallback((list: ChatMessageType[], appendUser?: { content: string; imageDataUrl?: string }) => {
     const items = appendUser
@@ -62,6 +63,7 @@ export function ChatPanel({ messages, setMessages, onCodeGenerated, onNewChat, c
       if (currentCode) body.currentCode = currentCode;
       if (apiKey.trim()) body.apiKey = apiKey.trim();
       if (model) body.model = model;
+      if (baseURL.trim()) body.baseURL = baseURL.trim();
 
       const res = await fetch("/api/chat", {
         method: "POST",
@@ -84,7 +86,7 @@ export function ChatPanel({ messages, setMessages, onCodeGenerated, onNewChat, c
         pendingConfirmation: true,
       };
     },
-    [buildHistory, apiKey, model]
+    [buildHistory, apiKey, model, baseURL]
   );
 
   const handleSend = useCallback(
@@ -180,6 +182,7 @@ export function ChatPanel({ messages, setMessages, onCodeGenerated, onNewChat, c
       if (currentCode) body.currentCode = currentCode;
       if (apiKey.trim()) body.apiKey = apiKey.trim();
       if (model) body.model = model;
+      if (baseURL.trim()) body.baseURL = baseURL.trim();
 
       try {
         const res = await fetch("/api/chat", {
@@ -273,7 +276,7 @@ export function ChatPanel({ messages, setMessages, onCodeGenerated, onNewChat, c
         setLoading(false);
       }
     },
-    [messages, buildHistory, apiKey, model, onCodeGenerated]
+    [messages, buildHistory, apiKey, model, baseURL, onCodeGenerated]
   );
 
   const handleRejectRequirement = useCallback((messageId: string) => {

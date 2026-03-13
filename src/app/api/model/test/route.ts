@@ -5,6 +5,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const apiKey = typeof body.apiKey === "string" ? body.apiKey.trim() : undefined;
+    const baseURLFromBody = typeof body.baseURL === "string" ? body.baseURL.trim() : undefined;
     const model =
       typeof body.model === "string" && body.model.trim()
         ? body.model.trim()
@@ -18,15 +19,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const baseURL = process.env.OPENAI_BASE_URL;
+    const effectiveBaseURL = baseURLFromBody || process.env.OPENAI_BASE_URL;
     const isQwen = model.includes("qwen");
-    if (isQwen && !baseURL) {
+    if (isQwen && !effectiveBaseURL) {
       return NextResponse.json(
         {
           code: 400,
           data: null,
           msg:
-            "使用 Qwen 模型时请在 .env.local 中设置 OPENAI_BASE_URL，例如：OPENAI_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1",
+            "使用 Qwen 模型时请填写 Base URL（如 https://dashscope.aliyuncs.com/compatible-mode/v1）或配置服务端 OPENAI_BASE_URL",
         },
         { status: 400 }
       );
@@ -34,7 +35,7 @@ export async function POST(request: NextRequest) {
 
     const openai = new OpenAI({
       apiKey: effectiveKey,
-      ...(baseURL && { baseURL }),
+      ...(effectiveBaseURL && { baseURL: effectiveBaseURL }),
     });
 
     await openai.chat.completions.create({
