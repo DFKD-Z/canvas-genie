@@ -1,7 +1,7 @@
 import OpenAI from "openai";
 import type { AIAdapter } from "./adapter";
 import type { ChatApiResponse } from "@/types";
-import { SYSTEM_PROMPT_2D, buildUserPrompt, REQUIREMENT_ANALYSIS_SYSTEM_PROMPT } from "./prompts";
+import { SYSTEM_PROMPT_2D, buildUserPrompt, buildRequirementAnalysisPrompt } from "./prompts";
 
 function extractCodeFromResponse(content: string): string {
   const trimmed = content.trim();
@@ -206,8 +206,9 @@ export function createOpenAIAdapter(options?: OpenAIAdapterOptions): AIAdapter {
           ]
         : textContent || "请分析我的需求。";
 
+      const systemPrompt = buildRequirementAnalysisPrompt(userMessage.trim(), hasImage);
       const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
-        { role: "system", content: REQUIREMENT_ANALYSIS_SYSTEM_PROMPT },
+        { role: "system", content: systemPrompt },
         ...(conversationHistory ?? []).map((m) => ({
           role: m.role as "user" | "assistant",
           content: m.content,
