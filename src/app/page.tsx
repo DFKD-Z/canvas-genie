@@ -35,6 +35,34 @@ export default function Home() {
     loadRecords();
   }, [loadRecords]);
 
+  /** 有聊天内容时自动持久化：首次发送后即创建记录，之后每次 messages/generated 变化都更新同一条 */
+  useEffect(() => {
+    const hasContent = messages.length > 0 || generated != null;
+    if (!hasContent) return;
+
+    const id = currentRecordId ?? createRecordId();
+    if (!currentRecordId) setCurrentRecordId(id);
+
+    let createdAt = Date.now();
+    getChatRecord(id)
+      .then((existing) => {
+        if (existing) createdAt = existing.createdAt;
+      })
+      .catch(() => {})
+      .finally(() => {
+        const title = recordTitleFromMessages(messages);
+        saveChatRecord({
+          id,
+          title,
+          messages,
+          generatedCode: generated,
+          createdAt,
+        })
+          .then(() => loadRecords())
+          .catch((e) => console.error("Failed to persist chat record:", e));
+      });
+  }, [messages, generated, currentRecordId, loadRecords]);
+
   const handleCodeGenerated = useCallback((code: GeneratedCode) => {
     setGenerated(code);
   }, []);
