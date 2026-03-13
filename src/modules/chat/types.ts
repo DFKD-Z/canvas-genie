@@ -7,6 +7,10 @@ export interface ChatMessage {
   /** data URL，便于 IndexedDB 序列化与展示 */
   imageDataUrl?: string;
   generatedCode?: { code: string; type: "2d" | "3d" };
+  /** 需求分析结论，仅 assistant 在「先分析后确认」流程中有 */
+  requirementAnalysis?: { summary: string };
+  /** 该条助理消息是否等待用户点「是/否」确认 */
+  pendingConfirmation?: boolean;
 }
 
 /** 流式 SSE 事件类型 */

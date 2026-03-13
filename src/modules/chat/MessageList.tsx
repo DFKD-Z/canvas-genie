@@ -10,6 +10,8 @@ interface MessageListProps {
   messages: ChatMessageType[];
   loading?: boolean;
   className?: string;
+  onConfirmRequirement?: (messageId: string) => void;
+  onRejectRequirement?: (messageId: string) => void;
 }
 
 function LoadingBubble() {
@@ -55,7 +57,13 @@ function ReasoningBlock({ reasoning }: { reasoning: string }) {
   );
 }
 
-export function MessageList({ messages, loading = false, className }: MessageListProps) {
+export function MessageList({
+  messages,
+  loading = false,
+  className,
+  onConfirmRequirement,
+  onRejectRequirement,
+}: MessageListProps) {
   if (messages.length === 0 && !loading) {
     return (
       <div
@@ -108,9 +116,35 @@ export function MessageList({ messages, loading = false, className }: MessageLis
               {msg.role === "user" && (msg.content?.trim() ?? "") && (
                 <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
               )}
-              {msg.role === "assistant" && !msg.generatedCode && (msg.content?.trim() ?? "") && (
-                <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
-              )}
+              {msg.role === "assistant" &&
+                msg.requirementAnalysis?.summary != null &&
+                (msg.pendingConfirmation ?? false) && (
+                  <>
+                    <p className="whitespace-pre-wrap leading-relaxed">{msg.requirementAnalysis.summary}</p>
+                    <div className="flex gap-2 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => onConfirmRequirement?.(msg.id)}
+                        className="rounded-lg bg-[hsl(var(--primary))] px-3 py-1.5 text-xs font-medium text-[hsl(var(--primary-foreground))] hover:opacity-90"
+                      >
+                        是
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onRejectRequirement?.(msg.id)}
+                        className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-1.5 text-xs font-medium text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))]"
+                      >
+                        否
+                      </button>
+                    </div>
+                  </>
+                )}
+              {msg.role === "assistant" &&
+                !msg.generatedCode &&
+                (msg.content?.trim() ?? "") &&
+                !(msg.requirementAnalysis != null && (msg.pendingConfirmation ?? false)) && (
+                  <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                )}
               {msg.role === "assistant" && msg.generatedCode && (
                 <p className="text-sm text-[hsl(var(--muted-foreground))]">已经完成</p>
               )}
@@ -123,9 +157,7 @@ export function MessageList({ messages, loading = false, className }: MessageLis
             </div>
           </div>
         ))}
-        {loading && (messages.length === 0 || messages[messages.length - 1]?.role !== "assistant") && (
-          <LoadingBubble />
-        )}
+        {loading && <LoadingBubble />}
       </div>
     </ScrollArea>
   );

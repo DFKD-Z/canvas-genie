@@ -2,6 +2,10 @@ import type { ChatApiResponse } from "@/types";
 
 export type StreamChunkType = "content" | "reasoning";
 
+export interface RequirementAnalysisResult {
+  analysis: string;
+}
+
 export interface AIAdapter {
   generateCanvasCode(
     userMessage: string,
@@ -21,4 +25,13 @@ export interface AIAdapter {
     imageDataUrl?: string,
     onChunk?: (type: StreamChunkType, text: string) => void
   ): Promise<ChatApiResponse>;
+
+  /**
+   * 需求分析：仅理解并归纳用户对 Canvas 效果的描述，返回面向用户的简洁分析文本，不生成代码。
+   */
+  analyzeRequirement?(
+    userMessage: string,
+    conversationHistory?: { role: string; content: string }[],
+    imageDataUrl?: string
+  ): Promise<RequirementAnalysisResult>;
 }

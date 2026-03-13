@@ -51,6 +51,22 @@ export function ChatPanel({ messages, setMessages, onCodeGenerated, onNewChat, c
     if (typeof window !== "undefined") localStorage.setItem(STORAGE_KEY_MODEL, v);
   }, []);
 
+  const buildHistory = useCallback((list: ChatMessageType[], appendUser?: { content: string; imageDataUrl?: string }) => {
+    const items = appendUser
+      ? [...list, { role: "user" as const, content: appendUser.content, imageDataUrl: appendUser.imageDataUrl }]
+      : list;
+    return items.map((m) => {
+      if (m.role === "assistant" && m.generatedCode?.code) {
+        return { role: m.role, content: `已生成 Canvas 代码：\n\n\`\`\`javascript\n${m.generatedCode.code}\n\`\`\`` };
+      }
+      if (m.role === "assistant" && m.requirementAnalysis?.summary != null) {
+        return { role: m.role, content: m.requirementAnalysis.summary };
+      }
+      const text = m.content?.trim() || (m.imageDataUrl ? "[附一张参考图]" : "");
+      return { role: m.role, content: text };
+    });
+  }, []);
+
   const handleSend = useCallback(
     async (content: string, imageDataUrl?: string) => {
       const userMsg: ChatMessageType = {
@@ -61,19 +77,14 @@ export function ChatPanel({ messages, setMessages, onCodeGenerated, onNewChat, c
       };
       setMessages((prev) => [...prev, userMsg]);
       setLoading(true);
-      const history = messages.map((m) => {
-        if (m.role === "assistant" && m.generatedCode?.code) {
-          return {
-            role: m.role,
-            content: `已生成 Canvas 代码：\n\n\`\`\`javascript\n${m.generatedCode.code}\n\`\`\``,
-          };
-        }
-        const text = m.content?.trim() || (m.imageDataUrl ? "[附一张参考图]" : "");
-        return { role: m.role, content: text };
-      });
-      const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant" && m.generatedCode?.code);
-      const currentCode = lastAssistant?.generatedCode?.code;
-      const body: Record<string, unknown> = { message: content, history, stream: true };
+      const history = buildHistory(messages, { content, imageDataUrl });
+      const lastAssistantWithCode = [...messages].reverse().find((m) => m.role === "assistant" && m.generatedCode?.code);
+      const currentCode = lastAssistantWithCode?.generatedCode?.code;
+      const body: Record<string, unknown> = {
+        message: content,
+        history,
+        step: "analyze",
+      };
       if (imageDataUrl) body.imageDataUrl = imageDataUrl;
       if (currentCode) body.currentCode = currentCode;
       if (apiKey.trim()) body.apiKey = apiKey.trim();
@@ -85,18 +96,65 @@ export function ChatPanel({ messages, setMessages, onCodeGenerated, onNewChat, c
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
         });
+        const json = await res.json();
+        if (json.code !== 0 || json.data == null) {
+          throw new Error(json.msg || "Request failed");
+        }
+        const analysis = typeof (json.data as { analysis?: string }).analysis === "string"
+          ? (json.data as { analysis: string }).analysis
+          : "";
+        const assistantMsg: ChatMessageType = {
+          id: `assistant-${Date.now()}`,
+          role: "assistant",
+          content: analysis || "未返回分析内容。",
+          requirementAnalysis: { summary: analysis || "未返回分析内容。" },
+          pendingConfirmation: true,
+        };
+        setMessages((prev) => [...prev, assistantMsg]);
+      } catch (err) {
+        const errMsg: ChatMessageType = {
+          id: `error-${Date.now()}`,
+          role: "assistant",
+          content: err instanceof Error ? err.message : "生成失败，请重试。",
+        };
+        setMessages((prev) => [...prev, errMsg]);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [messages, buildHistory, apiKey, model]
+  );
 
+  const handleConfirmRequirement = useCallback(
+    async (messageId: string) => {
+      const msg = messages.find((m) => m.id === messageId);
+      const summary = msg?.requirementAnalysis?.summary;
+      if (!summary || msg?.role !== "assistant") return;
+      setMessages((prev) =>
+        prev.map((m) => (m.id !== messageId ? m : { ...m, pendingConfirmation: false }))
+      );
+      setLoading(true);
+      const history = buildHistory(messages);
+      const lastAssistantWithCode = [...messages].reverse().find((m) => m.role === "assistant" && m.generatedCode?.code);
+      const currentCode = lastAssistantWithCode?.generatedCode?.code;
+      const body: Record<string, unknown> = {
+        step: "generate",
+        confirmedAnalysis: summary,
+        history,
+        stream: true,
+      };
+      if (currentCode) body.currentCode = currentCode;
+      if (apiKey.trim()) body.apiKey = apiKey.trim();
+      if (model) body.model = model;
+
+      try {
+        const res = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
         const contentType = res.headers.get("Content-Type") ?? "";
         if (contentType.includes("text/event-stream") && res.body) {
-          const assistantId = `assistant-${Date.now()}`;
-          const assistantMsg: ChatMessageType = {
-            id: assistantId,
-            role: "assistant",
-            content: "",
-            reasoning: "",
-          };
-          setMessages((prev) => [...prev, assistantMsg]);
-
           const reader = res.body.getReader();
           const decoder = new TextDecoder();
           let buffer = "";
@@ -106,19 +164,12 @@ export function ChatPanel({ messages, setMessages, onCodeGenerated, onNewChat, c
             if (raw === "[DONE]") return;
             try {
               const event = JSON.parse(raw) as StreamEvent;
-              if (event.t === "content") {
-                // 不在消息列表展示代码，仅服务端用于提取代码，此处不更新 content
-              } else if (event.t === "reasoning" && "v" in event) {
-                setMessages((prev) =>
-                  prev.map((m) =>
-                    m.id === assistantId ? { ...m, reasoning: (m.reasoning ?? "") + event.v } : m
-                  )
-                );
-              } else if (event.t === "done") {
+              if (event.t === "done") {
                 setMessages((prev) =>
                   prev.map((m) => {
-                    if (m.id !== assistantId) return m;
+                    if (m.id !== messageId) return m;
                     const next = { ...m };
+                    next.pendingConfirmation = false;
                     if ("code" in event && event.code) {
                       next.generatedCode = { code: event.code, type: event.type ?? "2d" };
                       next.content = "已经完成";
@@ -131,10 +182,9 @@ export function ChatPanel({ messages, setMessages, onCodeGenerated, onNewChat, c
                 );
               }
             } catch {
-              // 忽略非 JSON 的 data 行
+              // ignore
             }
           };
-
           while (true) {
             const { done, value } = await reader.read();
             if (done) break;
@@ -152,29 +202,29 @@ export function ChatPanel({ messages, setMessages, onCodeGenerated, onNewChat, c
           }
         } else {
           const json = await res.json();
-          if (json.code !== 0 || !json.data) {
-            throw new Error(json.msg || "Request failed");
-          }
+          if (json.code !== 0 || !json.data) throw new Error(json.msg || "Request failed");
           const data = json.data as ChatApiResponse;
           if (isCodeResponse(data)) {
-            const code = data.code;
-            const type = data.type ?? "2d";
-            const assistantMsg: ChatMessageType = {
-              id: `assistant-${Date.now()}`,
-              role: "assistant",
-              content: "已经完成",
-              generatedCode: { code, type },
-            };
-            setMessages((prev) => [...prev, assistantMsg]);
-            onCodeGenerated?.({ code, type });
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id !== messageId
+                  ? m
+                  : {
+                      ...m,
+                      pendingConfirmation: false,
+                      generatedCode: { code: data.code, type: data.type ?? "2d" },
+                      content: "已经完成",
+                    }
+              )
+            );
+            onCodeGenerated?.({ code: data.code, type: data.type ?? "2d" });
           } else {
             const text = typeof data.message === "string" ? data.message.trim() : "";
-            const assistantMsg: ChatMessageType = {
-              id: `assistant-${Date.now()}`,
-              role: "assistant",
-              content: text || "未返回内容。",
-            };
-            setMessages((prev) => [...prev, assistantMsg]);
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id !== messageId ? m : { ...m, pendingConfirmation: false, content: text || "未返回内容。" }
+              )
+            );
           }
         }
       } catch (err) {
@@ -188,8 +238,20 @@ export function ChatPanel({ messages, setMessages, onCodeGenerated, onNewChat, c
         setLoading(false);
       }
     },
-    [messages, onCodeGenerated, apiKey, model]
+    [messages, buildHistory, apiKey, model, onCodeGenerated]
   );
+
+  const handleRejectRequirement = useCallback((messageId: string) => {
+    const tipMsg: ChatMessageType = {
+      id: `tip-${Date.now()}`,
+      role: "assistant",
+      content: "请补充说明您的需求。",
+    };
+    setMessages((prev) => [
+      ...prev.map((m) => (m.id !== messageId ? m : { ...m, pendingConfirmation: false })),
+      tipMsg,
+    ]);
+  }, []);
 
   return (
     <div className={cn("flex h-full flex-col bg-[hsl(var(--card))]", className)}>
@@ -213,7 +275,12 @@ export function ChatPanel({ messages, setMessages, onCodeGenerated, onNewChat, c
             </button>
           )}
         </div>
-        <MessageList messages={messages} loading={loading} />
+        <MessageList
+          messages={messages}
+          loading={loading}
+          onConfirmRequirement={handleConfirmRequirement}
+          onRejectRequirement={handleRejectRequirement}
+        />
         <InputArea onSend={handleSend} disabled={loading} />
         <div className="shrink-0 border-t border-[hsl(var(--border))] bg-[hsl(var(--muted))]/20 px-4 py-3">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">

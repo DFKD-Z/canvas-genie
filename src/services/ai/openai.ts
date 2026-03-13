@@ -1,7 +1,7 @@
 import OpenAI from "openai";
 import type { AIAdapter } from "./adapter";
 import type { ChatApiResponse } from "@/types";
-import { SYSTEM_PROMPT_2D, buildUserPrompt } from "./prompts";
+import { SYSTEM_PROMPT_2D, buildUserPrompt, REQUIREMENT_ANALYSIS_SYSTEM_PROMPT } from "./prompts";
 
 function extractCodeFromResponse(content: string): string {
   const trimmed = content.trim();
@@ -174,6 +174,55 @@ export function createOpenAIAdapter(options?: OpenAIAdapterOptions): AIAdapter {
           return { message: fullContent.trim() };
         }
         return { code: extracted, type: "2d" as const };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg.includes("Connection error") || msg.includes("ECONNREFUSED") || msg.includes("fetch failed")) {
+          throw new Error(
+            `连接失败：请检查 OPENAI_BASE_URL 是否设为 DashScope 地址（如 https://dashscope.aliyuncs.com/compatible-mode/v1）、网络与防火墙，以及 OPENAI_API_KEY 是否为百炼 API Key。原始错误：${msg}`
+          );
+        }
+        throw err;
+      }
+    },
+
+    async analyzeRequirement(
+      userMessage: string,
+      conversationHistory?: { role: string; content: string }[],
+      imageDataUrl?: string
+    ) {
+      if (isQwen && !baseURL) {
+        throw new Error(
+          "使用 Qwen 模型时请在 .env.local 中设置 OPENAI_BASE_URL，例如：OPENAI_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1"
+        );
+      }
+
+      const hasImage = typeof imageDataUrl === "string" && imageDataUrl.startsWith("data:image/");
+      const textContent =
+        userMessage.trim() || (hasImage ? "请根据我提供的参考图理解并总结我希望实现的 Canvas 效果。" : "");
+      const userContent: string | OpenAI.Chat.ChatCompletionContentPart[] = hasImage
+        ? [
+            { type: "text", text: textContent || "请根据参考图分析我的需求。" },
+            { type: "image_url", image_url: { url: imageDataUrl, detail: "auto" } },
+          ]
+        : textContent || "请分析我的需求。";
+
+      const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+        { role: "system", content: REQUIREMENT_ANALYSIS_SYSTEM_PROMPT },
+        ...(conversationHistory ?? []).map((m) => ({
+          role: m.role as "user" | "assistant",
+          content: m.content,
+        })),
+        { role: "user", content: userContent },
+      ];
+
+      try {
+        const completion = await openai.chat.completions.create({
+          model,
+          messages,
+          temperature: 0.3,
+        });
+        const raw = completion.choices[0]?.message?.content ?? "";
+        return { analysis: raw.trim() || "未能归纳出明确需求，请补充描述。" };
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         if (msg.includes("Connection error") || msg.includes("ECONNREFUSED") || msg.includes("fetch failed")) {

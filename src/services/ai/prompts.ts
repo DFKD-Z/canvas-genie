@@ -29,7 +29,18 @@ function loadSystemPrompt2D(): string {
   }
 }
 
+function loadRequirementAnalysisPrompt(): string {
+  try {
+    const dir = path.join(process.cwd(), "src", "services", "ai");
+    const filePath = path.join(dir, "requirement-analysis-prompt.md");
+    return fs.readFileSync(filePath, "utf-8").trim();
+  } catch {
+    throw new Error("Failed to load requirement-analysis-prompt.md. Ensure the file exists under src/services/ai/.");
+  }
+}
+
 export const SYSTEM_PROMPT_2D = loadSystemPrompt2D();
+export const REQUIREMENT_ANALYSIS_SYSTEM_PROMPT = loadRequirementAnalysisPrompt();
 
 export function buildUserPrompt(description: string, currentCode?: string, hasImage?: boolean): string {
   const userPart = description.trim() || (hasImage ? "Generate 2D Canvas code based on the reference image." : "Generate 2D Canvas code.");
