@@ -7,11 +7,15 @@ import { Settings, LogIn, LogOut } from "lucide-react";
 import { useAuthStore } from "@/store/auth";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { SettingsModal } from "@/components/settings/SettingsModal";
+import { ModelConfigModal } from "@/components/settings/ModelConfigModal";
 
 export function SidebarUserBlock() {
   const router = useRouter();
   const { user, logout } = useAuthStore();
   const [open, setOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [modelConfigOpen, setModelConfigOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -29,6 +33,11 @@ export function SidebarUserBlock() {
     setOpen(false);
     logout();
     router.push("/login");
+  };
+
+  const handleOpenSettings = () => {
+    setOpen(false);
+    setSettingsOpen(true);
   };
 
   return (
@@ -66,12 +75,11 @@ export function SidebarUserBlock() {
                 variant="ghost"
                 size="sm"
                 className="h-8 justify-start gap-1.5 px-2 text-xs"
-                asChild
+                onClick={handleOpenSettings}
+                aria-label="用户设置"
               >
-                <Link href="#" aria-label="用户设置" onClick={() => setOpen(false)}>
-                  <Settings className="h-3.5 w-3.5 shrink-0" />
-                  用户设置
-                </Link>
+                <Settings className="h-3.5 w-3.5 shrink-0" />
+                用户设置
               </Button>
               <Button
                 variant="ghost"
@@ -85,6 +93,13 @@ export function SidebarUserBlock() {
               </Button>
             </div>
           )}
+
+          <SettingsModal
+            open={settingsOpen}
+            onOpenChange={setSettingsOpen}
+            onOpenModelConfig={() => setModelConfigOpen(true)}
+          />
+          <ModelConfigModal open={modelConfigOpen} onOpenChange={setModelConfigOpen} />
         </div>
       ) : (
         <Button variant="outline" size="sm" className="w-full justify-center gap-2" asChild>

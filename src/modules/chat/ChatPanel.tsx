@@ -1,24 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { MessageList } from "./MessageList";
 import { InputArea } from "./InputArea";
 import { cn } from "@/lib/utils";
+import { useModelStore, MODEL_OPTIONS } from "@/store/model";
 import type { ChatMessage as ChatMessageType } from "./types";
 import type { StreamEvent } from "./types";
 import type { ChatApiResponse, GeneratedCode } from "@/types";
 import { isCodeResponse } from "@/types";
-
-const STORAGE_KEY_API = "canvas-genie-apiKey";
-const STORAGE_KEY_MODEL = "canvas-genie-model";
-
-const MODEL_OPTIONS = [
-  { value: "gpt-4o-mini", label: "GPT-4o Mini" },
-  { value: "gpt-4o", label: "GPT-4o" },
-  { value: "gpt-4-turbo", label: "GPT-4 Turbo" },
-  { value: "qwen3.5-flash", label: "Qwen 3.5 Flash" },
-  { value: "qwen-turbo", label: "Qwen Turbo" },
-];
 
 interface ChatPanelProps {
   messages: ChatMessageType[];
@@ -31,26 +21,9 @@ interface ChatPanelProps {
 
 export function ChatPanel({ messages, setMessages, onCodeGenerated, onNewChat, className }: ChatPanelProps) {
   const [loading, setLoading] = useState(false);
-  const [apiKey, setApiKey] = useState("");
-  const [model, setModel] = useState("gpt-4o-mini");
   const sendingRef = useRef(false);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const savedKey = localStorage.getItem(STORAGE_KEY_API);
-    const savedModel = localStorage.getItem(STORAGE_KEY_MODEL);
-    if (savedKey != null) setApiKey(savedKey);
-    if (savedModel != null && MODEL_OPTIONS.some((o) => o.value === savedModel)) setModel(savedModel);
-  }, []);
-
-  const persistApiKey = useCallback((v: string) => {
-    setApiKey(v);
-    if (typeof window !== "undefined") localStorage.setItem(STORAGE_KEY_API, v);
-  }, []);
-  const persistModel = useCallback((v: string) => {
-    setModel(v);
-    if (typeof window !== "undefined") localStorage.setItem(STORAGE_KEY_MODEL, v);
-  }, []);
+  const apiKey = useModelStore((s) => s.apiKey);
+  const model = useModelStore((s) => s.model);
 
   const buildHistory = useCallback((list: ChatMessageType[], appendUser?: { content: string; imageDataUrl?: string }) => {
     const items = appendUser
@@ -346,37 +319,11 @@ export function ChatPanel({ messages, setMessages, onCodeGenerated, onNewChat, c
         />
         <InputArea onSend={handleSend} disabled={loading} />
         <div className="shrink-0 border-t border-[hsl(var(--border))] bg-[hsl(var(--muted))]/20 px-4 py-3">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
-            <div className="flex items-center gap-2">
-              <label htmlFor="chat-model" className="text-xs font-medium text-[hsl(var(--muted-foreground))] whitespace-nowrap">
-                模型
-              </label>
-              <select
-                id="chat-model"
-                value={model}
-                onChange={(e) => persistModel(e.target.value)}
-                className="h-8 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 text-xs text-[hsl(var(--foreground))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))]"
-              >
-                {MODEL_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="flex flex-1 items-center gap-2 min-w-0">
-              <label htmlFor="chat-apikey" className="text-xs font-medium text-[hsl(var(--muted-foreground))] whitespace-nowrap">
-                API Key
-              </label>
-              <input
-                id="chat-apikey"
-                type="password"
-                placeholder="可选，不填则使用服务端环境变量"
-                value={apiKey}
-                onChange={(e) => persistApiKey(e.target.value)}
-                className="h-8 flex-1 min-w-0 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 text-xs text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))]"
-              />
-            </div>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[hsl(var(--muted-foreground))]">
+            <span>
+              模型：<span className="font-medium text-[hsl(var(--foreground))]">{MODEL_OPTIONS.find((o) => o.value === model)?.label ?? model}</span>
+            </span>
+            <span>用量：—</span>
           </div>
         </div>
       </div>

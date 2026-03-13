@@ -15,7 +15,7 @@ export default function RegisterPage() {
           <p className="text-sm text-[hsl(var(--muted-foreground))]">
             当前为演示环境，仅支持使用已预设账号登录。
           </p>
-          <Button asChild className="w-full">
+          <Button asChild size="sm" className="w-full">
             <Link href="/login">去登录</Link>
           </Button>
         </CardContent>

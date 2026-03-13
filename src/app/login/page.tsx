@@ -98,7 +98,7 @@ export default function LoginPage() {
                 {error}
               </p>
             )}
-            <Button type="submit" className="w-full" disabled={submitting}>
+            <Button type="submit" size="sm" className="w-full" disabled={submitting}>
               {submitting ? "登录中…" : "登录"}
             </Button>
             <p className="text-center text-xs text-[hsl(var(--muted-foreground))]">
