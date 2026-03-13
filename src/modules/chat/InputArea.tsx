@@ -7,9 +7,10 @@ import { ImagePlus, X } from "lucide-react";
 
 const ACCEPT_IMAGE = "image/jpeg,image/png,image/webp,image/gif";
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_IMAGES = 3;
 
 interface InputAreaProps {
-  onSend: (content: string, imageDataUrl?: string) => void;
+  onSend: (content: string, imageDataUrls?: string[]) => void;
   disabled?: boolean;
   className?: string;
 }
@@ -25,20 +26,20 @@ function readFileAsDataUrl(file: File): Promise<string> {
 
 export function InputArea({ onSend, disabled, className }: InputAreaProps) {
   const [value, setValue] = useState("");
-  const [imageDataUrl, setImageDataUrl] = useState<string | null>(null);
+  const [imageDataUrls, setImageDataUrls] = useState<string[]>([]);
   const [imageError, setImageError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const canSend = value.trim() || imageDataUrl;
+  const canSend = value.trim() || imageDataUrls.length > 0;
 
   const handleSubmit = useCallback(() => {
     if (!canSend || disabled) return;
     const trimmed = value.trim();
-    onSend(trimmed, imageDataUrl ?? undefined);
+    onSend(trimmed, imageDataUrls.length > 0 ? imageDataUrls : undefined);
     setValue("");
-    setImageDataUrl(null);
+    setImageDataUrls([]);
     setImageError(null);
-  }, [value, imageDataUrl, canSend, disabled, onSend]);
+  }, [value, imageDataUrls, canSend, disabled, onSend]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -50,7 +51,7 @@ export function InputArea({ onSend, disabled, className }: InputAreaProps) {
     [handleSubmit]
   );
 
-  const validateAndSetImage = useCallback(async (file: File) => {
+  const appendImage = useCallback(async (file: File) => {
     if (!file.type.match(/^image\/(jpeg|png|webp|gif)$/)) {
       setImageError("请选择 jpeg、png、webp 或 gif 图片");
       return;
@@ -62,7 +63,13 @@ export function InputArea({ onSend, disabled, className }: InputAreaProps) {
     setImageError(null);
     try {
       const dataUrl = await readFileAsDataUrl(file);
-      setImageDataUrl(dataUrl);
+      setImageDataUrls((prev) => {
+        if (prev.length >= MAX_IMAGES) {
+          setImageError(`最多上传 ${MAX_IMAGES} 张图片`);
+          return prev;
+        }
+        return [...prev, dataUrl];
+      });
     } catch {
       setImageError("图片读取失败");
     }
@@ -70,23 +77,28 @@ export function InputArea({ onSend, disabled, className }: InputAreaProps) {
 
   const handleFileChange = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
+      const files = e.target.files;
       e.target.value = "";
-      if (!file) return;
-      await validateAndSetImage(file);
+      if (!files?.length) return;
+      for (let i = 0; i < files.length; i++) {
+        await appendImage(files[i]);
+      }
     },
-    [validateAndSetImage]
+    [appendImage]
   );
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
       if (disabled) return;
-      const file = e.dataTransfer.files?.[0];
-      if (!file) return;
-      validateAndSetImage(file);
+      const files = Array.from(e.dataTransfer.files ?? []).filter((f) =>
+        f.type.match(/^image\/(jpeg|png|webp|gif)$/)
+      );
+      if (!files.length) return;
+      files.slice(0, MAX_IMAGES - imageDataUrls.length).forEach((file) => appendImage(file));
+      if (files.length > MAX_IMAGES - imageDataUrls.length) setImageError(`最多上传 ${MAX_IMAGES} 张图片`);
     },
-    [disabled, validateAndSetImage]
+    [disabled, imageDataUrls.length, appendImage]
   );
 
   const handlePaste = useCallback(
@@ -94,10 +106,14 @@ export function InputArea({ onSend, disabled, className }: InputAreaProps) {
       if (disabled) return;
       const file = e.clipboardData.files?.[0];
       if (!file || !file.type.match(/^image\/(jpeg|png|webp|gif)$/)) return;
+      if (imageDataUrls.length >= MAX_IMAGES) {
+        setImageError(`最多上传 ${MAX_IMAGES} 张图片`);
+        return;
+      }
       e.preventDefault();
-      validateAndSetImage(file);
+      appendImage(file);
     },
-    [disabled, validateAndSetImage]
+    [disabled, imageDataUrls.length, appendImage]
   );
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -105,8 +121,8 @@ export function InputArea({ onSend, disabled, className }: InputAreaProps) {
     e.dataTransfer.dropEffect = "copy";
   }, []);
 
-  const clearImage = useCallback(() => {
-    setImageDataUrl(null);
+  const clearImage = useCallback((index: number) => {
+    setImageDataUrls((prev) => prev.filter((_, i) => i !== index));
     setImageError(null);
   }, []);
 
@@ -123,21 +139,25 @@ export function InputArea({ onSend, disabled, className }: InputAreaProps) {
         onDragOver={handleDragOver}
         onPaste={handlePaste}
       >
-        {imageDataUrl && (
-          <div className="relative mb-2 inline-block">
-            <img
-              src={imageDataUrl}
-              alt="上传的参考图"
-              className="max-h-32 rounded-lg border border-[hsl(var(--border))] object-contain"
-            />
-            <button
-              type="button"
-              onClick={clearImage}
-              className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))] hover:opacity-90"
-              aria-label="清除图片"
-            >
-              <X className="h-2 w-2" />
-            </button>
+        {imageDataUrls.length > 0 && (
+          <div className="mb-2 flex flex-wrap gap-1.5">
+            {imageDataUrls.map((url, index) => (
+              <div key={index} className="relative inline-block shrink-0">
+                <img
+                  src={url}
+                  alt={`参考图 ${index + 1}`}
+                  className="h-16 w-16 rounded-md border border-[hsl(var(--border))] object-cover"
+                />
+                <button
+                  type="button"
+                  onClick={() => clearImage(index)}
+                  className="absolute -right-0.5 -top-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))] hover:opacity-90"
+                  aria-label="移除该图片"
+                >
+                  <X className="h-2 w-2" />
+                </button>
+              </div>
+            ))}
           </div>
         )}
         {imageError && (
@@ -148,17 +168,18 @@ export function InputArea({ onSend, disabled, className }: InputAreaProps) {
             ref={fileInputRef}
             type="file"
             accept={ACCEPT_IMAGE}
+            multiple
             onChange={handleFileChange}
             className="hidden"
           />
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            disabled={disabled}
+            disabled={disabled || imageDataUrls.length >= MAX_IMAGES}
             className="flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted))]/50 px-3 text-xs text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))] disabled:opacity-50"
           >
             <ImagePlus className="h-4 w-4" />
-            上传图片
+            上传图片{imageDataUrls.length > 0 ? ` (${imageDataUrls.length}/${MAX_IMAGES})` : ""}
           </button>
         </div>
         <Textarea

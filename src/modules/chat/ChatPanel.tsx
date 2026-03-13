@@ -115,9 +115,10 @@ export function ChatPanel({ messages, setMessages, onCodeGenerated, onNewChat, c
   );
 
   const handleSend = useCallback(
-    async (content: string, imageDataUrl?: string) => {
+    async (content: string, imageDataUrls?: string[]) => {
       if (sendingRef.current) return;
       sendingRef.current = true;
+      const imageDataUrl = imageDataUrls?.[0];
       const userMsg: ChatMessageType = {
         id: `user-${Date.now()}`,
         role: "user",
