@@ -4,7 +4,7 @@ import { useState } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { ChatMessage as ChatMessageType } from "./types";
 import { cn } from "@/lib/utils";
-import { Sparkles, Loader2, ChevronDown, ChevronRight } from "lucide-react";
+import { Sparkles, Loader2, ChevronDown, ChevronRight, RotateCcw } from "lucide-react";
 
 interface MessageListProps {
   messages: ChatMessageType[];
@@ -12,6 +12,7 @@ interface MessageListProps {
   className?: string;
   onConfirmRequirement?: (messageId: string) => void;
   onRejectRequirement?: (messageId: string) => void;
+  onRetry?: (errorMessageId: string) => void;
 }
 
 function LoadingBubble() {
@@ -63,6 +64,7 @@ export function MessageList({
   className,
   onConfirmRequirement,
   onRejectRequirement,
+  onRetry,
 }: MessageListProps) {
   if (messages.length === 0 && !loading) {
     return (
@@ -153,6 +155,18 @@ export function MessageList({
               )}
               {msg.role === "user" && msg.imageDataUrl && !msg.content?.trim() && (
                 <p className="text-xs opacity-80">根据图片生成</p>
+              )}
+              {msg.role === "assistant" && msg.isError && (
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={() => onRetry?.(msg.id)}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-[hsl(var(--primary))] px-3 py-1.5 text-xs font-medium text-[hsl(var(--primary-foreground))] hover:opacity-90"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    重试
+                  </button>
+                </div>
               )}
             </div>
           </div>

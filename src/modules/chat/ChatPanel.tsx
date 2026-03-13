@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { MessageList } from "./MessageList";
 import { InputArea } from "./InputArea";
 import { cn } from "@/lib/utils";
@@ -33,6 +33,7 @@ export function ChatPanel({ messages, setMessages, onCodeGenerated, onNewChat, c
   const [loading, setLoading] = useState(false);
   const [apiKey, setApiKey] = useState("");
   const [model, setModel] = useState("gpt-4o-mini");
+  const sendingRef = useRef(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -67,18 +68,17 @@ export function ChatPanel({ messages, setMessages, onCodeGenerated, onNewChat, c
     });
   }, []);
 
-  const handleSend = useCallback(
-    async (content: string, imageDataUrl?: string) => {
-      const userMsg: ChatMessageType = {
-        id: `user-${Date.now()}`,
-        role: "user",
-        content,
-        ...(imageDataUrl && { imageDataUrl }),
-      };
-      setMessages((prev) => [...prev, userMsg]);
-      setLoading(true);
-      const history = buildHistory(messages, { content, imageDataUrl });
-      const lastAssistantWithCode = [...messages].reverse().find((m) => m.role === "assistant" && m.generatedCode?.code);
+  const runAnalyzeRequest = useCallback(
+    async (
+      content: string,
+      imageDataUrl: string | undefined,
+      historyList: ChatMessageType[],
+      fullMessages: ChatMessageType[]
+    ): Promise<ChatMessageType> => {
+      const history = buildHistory(historyList, { content, imageDataUrl });
+      const lastAssistantWithCode = [...fullMessages]
+        .reverse()
+        .find((m) => m.role === "assistant" && m.generatedCode?.code);
       const currentCode = lastAssistantWithCode?.generatedCode?.code;
       const body: Record<string, unknown> = {
         message: content,
@@ -90,39 +90,99 @@ export function ChatPanel({ messages, setMessages, onCodeGenerated, onNewChat, c
       if (apiKey.trim()) body.apiKey = apiKey.trim();
       if (model) body.model = model;
 
-      try {
-        const res = await fetch("/api/chat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        });
-        const json = await res.json();
-        if (json.code !== 0 || json.data == null) {
-          throw new Error(json.msg || "Request failed");
-        }
-        const analysis = typeof (json.data as { analysis?: string }).analysis === "string"
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const json = await res.json();
+      if (json.code !== 0 || json.data == null) {
+        throw new Error(json.msg || "Request failed");
+      }
+      const analysis =
+        typeof (json.data as { analysis?: string }).analysis === "string"
           ? (json.data as { analysis: string }).analysis
           : "";
-        const assistantMsg: ChatMessageType = {
-          id: `assistant-${Date.now()}`,
-          role: "assistant",
-          content: analysis || "未返回分析内容。",
-          requirementAnalysis: { summary: analysis || "未返回分析内容。" },
-          pendingConfirmation: true,
-        };
+      return {
+        id: `assistant-${Date.now()}`,
+        role: "assistant",
+        content: analysis || "未返回分析内容。",
+        requirementAnalysis: { summary: analysis || "未返回分析内容。" },
+        pendingConfirmation: true,
+      };
+    },
+    [buildHistory, apiKey, model]
+  );
+
+  const handleSend = useCallback(
+    async (content: string, imageDataUrl?: string) => {
+      if (sendingRef.current) return;
+      sendingRef.current = true;
+      const userMsg: ChatMessageType = {
+        id: `user-${Date.now()}`,
+        role: "user",
+        content,
+        ...(imageDataUrl && { imageDataUrl }),
+      };
+      setMessages((prev) => [...prev, userMsg]);
+      setLoading(true);
+      try {
+        const assistantMsg = await runAnalyzeRequest(content, imageDataUrl, messages, messages);
         setMessages((prev) => [...prev, assistantMsg]);
       } catch (err) {
         const errMsg: ChatMessageType = {
           id: `error-${Date.now()}`,
           role: "assistant",
           content: err instanceof Error ? err.message : "生成失败，请重试。",
+          isError: true,
         };
         setMessages((prev) => [...prev, errMsg]);
       } finally {
+        sendingRef.current = false;
         setLoading(false);
       }
     },
-    [messages, buildHistory, apiKey, model]
+    [messages, runAnalyzeRequest]
+  );
+
+  const handleRetry = useCallback(
+    async (errorMessageId: string) => {
+      if (sendingRef.current) return;
+      const errIdx = messages.findIndex((m) => m.id === errorMessageId);
+      if (errIdx === -1) return;
+      let userMsg: ChatMessageType | null = null;
+      for (let i = errIdx - 1; i >= 0; i--) {
+        if (messages[i].role === "user") {
+          userMsg = messages[i];
+          break;
+        }
+      }
+      if (!userMsg) return;
+      sendingRef.current = true;
+      setLoading(true);
+      try {
+        const historyList = messages.slice(0, messages.findIndex((m) => m.id === userMsg!.id));
+        const assistantMsg = await runAnalyzeRequest(
+          userMsg.content,
+          userMsg.imageDataUrl,
+          historyList,
+          messages
+        );
+        setMessages((prev) => [...prev, assistantMsg]);
+      } catch (err) {
+        const errMsg: ChatMessageType = {
+          id: `error-${Date.now()}`,
+          role: "assistant",
+          content: err instanceof Error ? err.message : "生成失败，请重试。",
+          isError: true,
+        };
+        setMessages((prev) => [...prev, errMsg]);
+      } finally {
+        sendingRef.current = false;
+        setLoading(false);
+      }
+    },
+    [messages, runAnalyzeRequest]
   );
 
   const handleConfirmRequirement = useCallback(
@@ -232,6 +292,7 @@ export function ChatPanel({ messages, setMessages, onCodeGenerated, onNewChat, c
           id: `error-${Date.now()}`,
           role: "assistant",
           content: err instanceof Error ? err.message : "生成失败，请重试。",
+          isError: true,
         };
         setMessages((prev) => [...prev, errMsg]);
       } finally {
@@ -280,6 +341,7 @@ export function ChatPanel({ messages, setMessages, onCodeGenerated, onNewChat, c
           loading={loading}
           onConfirmRequirement={handleConfirmRequirement}
           onRejectRequirement={handleRejectRequirement}
+          onRetry={handleRetry}
         />
         <InputArea onSend={handleSend} disabled={loading} />
         <div className="shrink-0 border-t border-[hsl(var(--border))] bg-[hsl(var(--muted))]/20 px-4 py-3">

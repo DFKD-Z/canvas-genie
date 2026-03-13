@@ -11,6 +11,8 @@ export interface ChatMessage {
   requirementAnalysis?: { summary: string };
   /** 该条助理消息是否等待用户点「是/否」确认 */
   pendingConfirmation?: boolean;
+  /** 是否为发送/生成失败的错误消息，用于展示重试入口 */
+  isError?: boolean;
 }
 
 /** 流式 SSE 事件类型 */

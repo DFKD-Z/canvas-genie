@@ -50,28 +50,32 @@ export function InputArea({ onSend, disabled, className }: InputAreaProps) {
     [handleSubmit]
   );
 
+  const validateAndSetImage = useCallback(async (file: File) => {
+    if (!file.type.match(/^image\/(jpeg|png|webp|gif)$/)) {
+      setImageError("请选择 jpeg、png、webp 或 gif 图片");
+      return;
+    }
+    if (file.size > MAX_IMAGE_SIZE) {
+      setImageError("图片请小于 5MB");
+      return;
+    }
+    setImageError(null);
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+      setImageDataUrl(dataUrl);
+    } catch {
+      setImageError("图片读取失败");
+    }
+  }, []);
+
   const handleFileChange = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       e.target.value = "";
       if (!file) return;
-      if (!file.type.match(/^image\/(jpeg|png|webp|gif)$/)) {
-        setImageError("请选择 jpeg、png、webp 或 gif 图片");
-        return;
-      }
-      if (file.size > MAX_IMAGE_SIZE) {
-        setImageError("图片请小于 5MB");
-        return;
-      }
-      setImageError(null);
-      try {
-        const dataUrl = await readFileAsDataUrl(file);
-        setImageDataUrl(dataUrl);
-      } catch {
-        setImageError("图片读取失败");
-      }
+      await validateAndSetImage(file);
     },
-    []
+    [validateAndSetImage]
   );
 
   const handleDrop = useCallback(
@@ -80,18 +84,20 @@ export function InputArea({ onSend, disabled, className }: InputAreaProps) {
       if (disabled) return;
       const file = e.dataTransfer.files?.[0];
       if (!file) return;
-      if (!file.type.match(/^image\/(jpeg|png|webp|gif)$/)) {
-        setImageError("请选择 jpeg、png、webp 或 gif 图片");
-        return;
-      }
-      if (file.size > MAX_IMAGE_SIZE) {
-        setImageError("图片请小于 5MB");
-        return;
-      }
-      setImageError(null);
-      readFileAsDataUrl(file).then(setImageDataUrl).catch(() => setImageError("图片读取失败"));
+      validateAndSetImage(file);
     },
-    [disabled]
+    [disabled, validateAndSetImage]
+  );
+
+  const handlePaste = useCallback(
+    (e: React.ClipboardEvent) => {
+      if (disabled) return;
+      const file = e.clipboardData.files?.[0];
+      if (!file || !file.type.match(/^image\/(jpeg|png|webp|gif)$/)) return;
+      e.preventDefault();
+      validateAndSetImage(file);
+    },
+    [disabled, validateAndSetImage]
   );
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -115,6 +121,7 @@ export function InputArea({ onSend, disabled, className }: InputAreaProps) {
         className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] p-2 shadow-sm focus-within:ring-2 focus-within:ring-[hsl(var(--ring))] focus-within:ring-offset-2"
         onDrop={handleDrop}
         onDragOver={handleDragOver}
+        onPaste={handlePaste}
       >
         {imageDataUrl && (
           <div className="relative mb-2 inline-block">
@@ -126,10 +133,10 @@ export function InputArea({ onSend, disabled, className }: InputAreaProps) {
             <button
               type="button"
               onClick={clearImage}
-              className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))] hover:opacity-90"
+              className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))] hover:opacity-90"
               aria-label="清除图片"
             >
-              <X className="h-3.5 w-3.5" />
+              <X className="h-2 w-2" />
             </button>
           </div>
         )}
